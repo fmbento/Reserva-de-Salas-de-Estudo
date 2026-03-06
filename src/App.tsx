@@ -116,8 +116,18 @@ const SchedulesView = ({
     });
   };
 
+  const isSlotInPast = (dayIndex: number, hourStr: string, minute: number) => {
+    const now = new Date();
+    const slotDate = new Date(currentDate);
+    // Logic to get the date of the specific dayIndex (0=Mon, 6=Sun)
+    slotDate.setDate(slotDate.getDate() - (slotDate.getDay() === 0 ? 6 : slotDate.getDay() - 1) + dayIndex);
+    const hour = parseInt(hourStr.split(':')[0]);
+    slotDate.setHours(hour, minute, 0, 0);
+    return slotDate < now;
+  };
+
   const handleMouseDown = (dayIndex: number, hourStr: string, minute: number) => {
-    if (isSlotOccupied(dayIndex, hourStr, minute)) return;
+    if (isSlotOccupied(dayIndex, hourStr, minute) || isSlotInPast(dayIndex, hourStr, minute)) return;
     
     const hour = parseInt(hourStr.split(':')[0]);
     setDragStart({ day: dayIndex, hour, minute });
@@ -127,8 +137,8 @@ const SchedulesView = ({
 
   const handleMouseEnter = (dayIndex: number, hourStr: string, minute: number) => {
     if (isDragging && dragStart && dayIndex === dragStart.day) {
-      if (isSlotOccupied(dayIndex, hourStr, minute)) {
-        // Stop dragging if we hit an occupied slot
+      if (isSlotOccupied(dayIndex, hourStr, minute) || isSlotInPast(dayIndex, hourStr, minute)) {
+        // Stop dragging if we hit an occupied or past slot
         handleMouseUp();
         return;
       }
@@ -419,10 +429,11 @@ const SchedulesView = ({
                           onMouseDown={() => handleMouseDown(dayIndex, hour, minute)}
                           onMouseEnter={() => handleMouseEnter(dayIndex, hour, minute)}
                           onMouseUp={handleMouseUp}
-                          disabled={isSlotOccupied(dayIndex, hour, minute)}
+                          disabled={isSlotOccupied(dayIndex, hour, minute) || isSlotInPast(dayIndex, hour, minute)}
                           className={`flex-1 transition-colors border-b border-slate-50 last:border-0 group relative ${
                             isSlotSelected(dayIndex, hour, minute) ? 'bg-primary/20' : 
-                            isSlotOccupied(dayIndex, hour, minute) ? 'cursor-not-allowed' : 'hover:bg-primary/5'
+                            isSlotOccupied(dayIndex, hour, minute) ? 'cursor-not-allowed' : 
+                            isSlotInPast(dayIndex, hour, minute) ? 'bg-slate-50 cursor-not-allowed' : 'hover:bg-primary/5'
                           }`}
                         >
                           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none z-20">
@@ -585,6 +596,17 @@ export default function App() {
       );
 
   const handleConfirmBooking = async (forcedDuration?: number) => {
+    const now = new Date();
+    const [h, m] = bookingStartTime.split(':').map(Number);
+    const bDate = new Date(bookingDate + 'T00:00:00');
+    bDate.setHours(h, m, 0, 0);
+    
+    if (bDate < now) {
+      setBookingStatus('error');
+      setBookingMessage('Não é possível reservar para uma data ou hora anterior à atual.');
+      return;
+    }
+
     setBookingStatus('checking');
     setBookingMessage('A verificar disponibilidade em tempo real...');
 
@@ -1155,9 +1177,26 @@ export default function App() {
 
                       <button 
                         onClick={() => handleConfirmBooking()}
-                        disabled={bookingStatus === 'checking' || getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available'}
+                        disabled={
+                          bookingStatus === 'checking' || 
+                          getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                          (() => {
+                            const now = new Date();
+                            const [h, m] = bookingStartTime.split(':').map(Number);
+                            const bDate = new Date(bookingDate + 'T00:00:00');
+                            bDate.setHours(h, m, 0, 0);
+                            return bDate < now;
+                          })()
+                        }
                         className={`w-full rounded-xl py-3 text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
-                          getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' 
+                          getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                          (() => {
+                            const now = new Date();
+                            const [h, m] = bookingStartTime.split(':').map(Number);
+                            const bDate = new Date(bookingDate + 'T00:00:00');
+                            bDate.setHours(h, m, 0, 0);
+                            return bDate < now;
+                          })()
                             ? 'bg-slate-300 cursor-not-allowed shadow-none' 
                             : 'bg-primary shadow-primary/25 hover:bg-primary/90'
                         }`}
