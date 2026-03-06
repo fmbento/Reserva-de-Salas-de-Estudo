@@ -1,0 +1,5 @@
+{
+  "name": "SIRS - UA",
+  "description": "Sistema de reserva de salas de estudo para a Universidade de Aveiro.",
+  "requestFramePermissions": []
+}
