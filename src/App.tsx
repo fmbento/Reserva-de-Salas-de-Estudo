@@ -48,6 +48,7 @@ interface Reservation {
   id: string;
   roomId: string;
   roomName: string;
+  userId: number;
   date: string;
   startTime: string;
   duration: string;
@@ -504,10 +505,13 @@ export default function App() {
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
   const [conflictModal, setConflictModal] = useState<{
     isOpen: boolean;
-    availableUntil: string;
+    type: 'room' | 'user_start' | 'user_end';
+    availableUntil?: string;
+    availableFrom?: string;
     originalDuration: number;
     newDuration: number;
-  }>({ isOpen: false, availableUntil: '', originalDuration: 0, newDuration: 0 });
+    newStartTime?: string;
+  }>({ isOpen: false, type: 'room', originalDuration: 0, newDuration: 0 });
 
   // Fetch initial data
   useEffect(() => {
@@ -537,6 +541,7 @@ export default function App() {
           id: r.id.toString(),
           roomId: r.room_id,
           roomName: r.room_name,
+          userId: r.user_id,
           date: r.date,
           startTime: r.start_time,
           duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
@@ -595,9 +600,10 @@ export default function App() {
         room.department.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
-  const handleConfirmBooking = async (forcedDuration?: number) => {
+  const handleConfirmBooking = async (forcedDuration?: number, forcedStartTime?: string) => {
     const now = new Date();
-    const [h, m] = bookingStartTime.split(':').map(Number);
+    const activeStartTime = forcedStartTime || bookingStartTime;
+    const [h, m] = activeStartTime.split(':').map(Number);
     const bDate = new Date(bookingDate + 'T00:00:00');
     bDate.setHours(h, m, 0, 0);
     
@@ -627,15 +633,96 @@ export default function App() {
       }
     }
 
-    const startH = parseInt(bookingStartTime.split(':')[0]);
-    const startM = parseInt(bookingStartTime.split(':')[1] || '0');
+    const startH = parseInt(activeStartTime.split(':')[0]);
+    const startM = parseInt(activeStartTime.split(':')[1] || '0');
     const startTotal = startH * 60 + startM;
+    const requestedEndTotal = startTotal + durationMins;
 
-    // Check for future conflicts if not already forced
-    if (!forcedDuration) {
-      const requestedEndTotal = startTotal + durationMins;
+    // 1. Check for USER'S OWN schedule conflicts (across all rooms)
+    if (!forcedDuration && !forcedStartTime) {
+      const userReservations = reservations
+        .filter(res => res.userId === currentUser?.id && res.date === bookingDate && res.status !== 'Cancelled')
+        .map(res => {
+          const resStartH = parseInt(res.startTime.split(':')[0]);
+          const resStartM = parseInt(res.startTime.split(':')[1] || '0');
+          const resStartTotal = resStartH * 60 + resStartM;
+          
+          let resDurationMins = 60;
+          if (res.duration.includes('Hora')) {
+            const h = parseInt(res.duration.split(' ')[0]);
+            resDurationMins = h * 60;
+            if (res.duration.includes('e')) {
+              resDurationMins += parseInt(res.duration.split('e ')[1]);
+            }
+          } else {
+            resDurationMins = parseInt(res.duration.split(' ')[0]);
+          }
+          
+          return { ...res, startTotal: resStartTotal, endTotal: resStartTotal + resDurationMins };
+        });
+
+      // Check for overlap
+      const overlappingRes = userReservations.find(res => 
+        (startTotal < res.endTotal && requestedEndTotal > res.startTotal)
+      );
+
+      if (overlappingRes) {
+        // Try to suggest adjustments
+        // Case A: User has a reservation that ends after our requested start
+        if (overlappingRes.endTotal > startTotal && overlappingRes.startTotal <= startTotal) {
+          const newStartTotal = overlappingRes.endTotal;
+          const newDuration = requestedEndTotal - newStartTotal;
+          
+          if (newDuration > 0) {
+            const newStartH = Math.floor(newStartTotal / 60);
+            const newStartM = newStartTotal % 60;
+            const newStartStr = `${newStartH.toString().padStart(2, '0')}:${newStartM.toString().padStart(2, '0')}`;
+            
+            setConflictModal({
+              isOpen: true,
+              type: 'user_start',
+              availableFrom: newStartStr,
+              originalDuration: durationMins,
+              newDuration: newDuration,
+              newStartTime: newStartStr
+            });
+            setBookingStatus('idle');
+            return;
+          }
+        }
+        
+        // Case B: User has a reservation that starts before our requested end
+        if (overlappingRes.startTotal < requestedEndTotal && overlappingRes.endTotal >= requestedEndTotal) {
+          const newDuration = overlappingRes.startTotal - startTotal;
+          
+          if (newDuration > 0) {
+            const availableUntilH = Math.floor(overlappingRes.startTotal / 60);
+            const availableUntilM = overlappingRes.startTotal % 60;
+            const availableUntilStr = `${availableUntilH.toString().padStart(2, '0')}:${availableUntilM.toString().padStart(2, '0')}`;
+            
+            setConflictModal({
+              isOpen: true,
+              type: 'user_end',
+              availableUntil: availableUntilStr,
+              originalDuration: durationMins,
+              newDuration: newDuration
+            });
+            setBookingStatus('idle');
+            return;
+          }
+        }
+
+        // Fallback: Strict refusal if no adjustment possible or total overlap
+        setBookingStatus('error');
+        setBookingMessage('Já possui uma reserva ativa que se sobrepõe a este horário. Se desejar manter esta nova marcação, deverá primeiro apagar a(s) outra(s) reserva(s) que fez antes para parte do tempo que agora estava a marcar, e voltar a inserir a reserva pretendida.');
+        return;
+      }
+    }
+
+    // 2. Check for ROOM conflicts (if not already forced)
+    if (!forcedDuration && !forcedStartTime) {
       const nextReservation = reservations
-        .filter(res => res.roomId === selectedRoomId && res.date === bookingDate)
+        .filter(res => res.roomId === selectedRoomId && res.date === bookingDate && res.status !== 'Cancelled')
         .map(res => {
           const resStartH = parseInt(res.startTime.split(':')[0]);
           const resStartM = parseInt(res.startTime.split(':')[1] || '0');
@@ -652,6 +739,7 @@ export default function App() {
         
         setConflictModal({
           isOpen: true,
+          type: 'room',
           availableUntil: availableUntilStr,
           originalDuration: durationMins,
           newDuration: availableMins
@@ -669,7 +757,7 @@ export default function App() {
           room_id: selectedRoomId,
           user_id: currentUser?.id || 1,
           date: bookingDate,
-          start_time: bookingStartTime,
+          start_time: activeStartTime,
           duration: durationMins,
           subject: bookingSubject
         })
@@ -1277,18 +1365,33 @@ export default function App() {
                 </div>
                 <h3 className="text-2xl font-bold text-slate-900 mb-2">Conflito de Horário</h3>
                 <p className="text-slate-600 mb-6">
-                  Esta sala só está disponível até às <span className="font-bold text-slate-900">{conflictModal.availableUntil}</span> devido a outra reserva. 
-                  Deseja aceitar a reserva com a duração reduzida para <span className="font-bold text-slate-900">{conflictModal.newDuration} minutos</span>?
+                  {conflictModal.type === 'room' ? (
+                    <>
+                      Esta sala só está disponível até às <span className="font-bold text-slate-900">{conflictModal.availableUntil}</span> devido a outra reserva. 
+                      Deseja aceitar a reserva com a duração reduzida para <span className="font-bold text-slate-900">{conflictModal.newDuration} minutos</span>?
+                    </>
+                  ) : conflictModal.type === 'user_start' ? (
+                    <>
+                      Já possui outra reserva que termina às <span className="font-bold text-slate-900">{conflictModal.availableFrom}</span>. 
+                      Deseja alterar a hora de início para as <span className="font-bold text-slate-900">{conflictModal.newStartTime}</span>?
+                    </>
+                  ) : (
+                    <>
+                      Já possui outra reserva que começa às <span className="font-bold text-slate-900">{conflictModal.availableUntil}</span>. 
+                      Deseja reduzir a duração desta reserva para <span className="font-bold text-slate-900">{conflictModal.newDuration} minutos</span>?
+                    </>
+                  )}
                 </p>
                 <div className="flex flex-col gap-3">
                   <button 
                     onClick={() => {
+                      const { newDuration, newStartTime } = conflictModal;
                       setConflictModal({ ...conflictModal, isOpen: false });
-                      handleConfirmBooking(conflictModal.newDuration);
+                      handleConfirmBooking(newDuration, newStartTime);
                     }}
                     className="w-full py-3.5 rounded-xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20"
                   >
-                    Sim, aceitar nova duração
+                    Sim, aceitar alteração
                   </button>
                   <button 
                     onClick={() => setConflictModal({ ...conflictModal, isOpen: false })}
