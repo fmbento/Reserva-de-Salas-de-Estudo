@@ -4,16 +4,23 @@ import Database from "better-sqlite3";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs"; // Adicione este import no topo
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const dataDir = path.join(__dirname, "data");
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
 let db: any;
 try {
-  db = new Database("database.sqlite");
-  console.log("Database initialized successfully");
+  // Alteração aqui: aponta para a subpasta /data mapeada no Docker
+  db = new Database(path.join(dataDir, "salas.db")); 
+  console.log("Database initialized successfully at ./data/salas.db");
 } catch (error) {
   console.error("Failed to initialize database:", error);
   process.exit(1);
