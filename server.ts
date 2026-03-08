@@ -34,7 +34,10 @@ db.exec(`
     department TEXT NOT NULL,
     status TEXT NOT NULL,
     capacity INTEGER,
-    description TEXT
+    description TEXT,
+    operational_status TEXT DEFAULT 'Active',
+    image TEXT,
+    amenities TEXT DEFAULT '[]'
   );
 
   CREATE TABLE IF NOT EXISTS reservations (
@@ -49,7 +52,13 @@ db.exec(`
     FOREIGN KEY (room_id) REFERENCES rooms(id),
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
+
+  -- Ensure rooms table has the new columns
 `);
+
+try { db.exec("ALTER TABLE rooms ADD COLUMN operational_status TEXT DEFAULT 'Active'"); } catch(e) {}
+try { db.exec("ALTER TABLE rooms ADD COLUMN image TEXT"); } catch(e) {}
+try { db.exec("ALTER TABLE rooms ADD COLUMN amenities TEXT DEFAULT '[]'"); } catch(e) {}
 
 // Seed initial data
 const seedData = () => {
@@ -73,9 +82,9 @@ const seedData = () => {
     console.warn(`Warning: Only ${allUsersInDb.length} users found in DB. Expected at least 4.`);
   }
 
-  const u2 = db.prepare("SELECT id FROM users WHERE email = ?").get("teste2@ua.pt") as { id: number } | undefined;
+  const u2 = db.prepare("SELECT id FROM users WHERE email = ?").get("teste02@ua.pt") as { id: number } | undefined;
   if (!u2) {
-    console.error("Critical error: Seed user 'teste2@ua.pt' not found after insertion.");
+    console.error("Critical error: Seed user 'teste02@ua.pt' not found after insertion.");
     return;
   }
 
@@ -219,6 +228,29 @@ async function startServer() {
     const users = db.prepare("SELECT * FROM users").all();
     console.log("Serving /api/users request. Count:", users.length);
     res.json(users);
+  });
+
+  app.put("/api/rooms/:id", (req, res) => {
+    const { id } = req.params;
+    const { name, department, capacity, operational_status, image, amenities } = req.body;
+    
+    try {
+      const stmt = db.prepare(`
+        UPDATE rooms 
+        SET name = ?, department = ?, capacity = ?, operational_status = ?, image = ?, amenities = ?
+        WHERE id = ?
+      `);
+      const result = stmt.run(name, department, capacity, operational_status, image, JSON.stringify(amenities), id);
+      
+      if (result.changes > 0) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: "Room not found" });
+      }
+    } catch (error) {
+      console.error("Error updating room:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   app.patch("/api/reservations/:id/status", (req, res) => {

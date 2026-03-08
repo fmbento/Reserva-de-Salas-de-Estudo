@@ -26,17 +26,27 @@ import {
   X,
   Trash2,
   Calendar,
-  ChevronLeft
+  ChevronLeft,
+  Projector,
+  Wind,
+  Image as ImageIcon,
+  Filter,
+  MoreVertical,
+  Check,
+  RotateCcw,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type RoomStatus = 'Available' | 'Pending' | 'Occupied';
+type OperationalStatus = 'Active' | 'Maintenance' | 'Inactive';
 
 interface Room {
   id: string;
   name: string;
   department: string;
   status: RoomStatus;
+  operationalStatus: OperationalStatus;
   capacity: number;
   amenities: string[];
   image: string;
@@ -66,11 +76,13 @@ interface UserData {
 const BackofficeView = ({ 
   reservations, 
   users,
-  onUpdateStatus 
+  onUpdateStatus,
+  onManageRooms
 }: { 
   reservations: Reservation[], 
   users: UserData[],
-  onUpdateStatus: (id: string, status: string) => void 
+  onUpdateStatus: (id: string, status: string) => void,
+  onManageRooms: () => void
 }) => {
   const now = new Date();
   
@@ -89,6 +101,13 @@ const BackofficeView = ({
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">Gestão de Reservas</h1>
             <p className="text-slate-500 mt-1">Aprovação e monitorização de pedidos de salas (Apenas futuras).</p>
           </div>
+          <button 
+            onClick={onManageRooms}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <Settings size={18} className="text-primary" />
+            Gestão de Salas
+          </button>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -167,6 +186,378 @@ const BackofficeView = ({
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ManageRoomsView = ({ 
+  rooms, 
+  onUpdateRoom,
+  onBack
+}: { 
+  rooms: Room[], 
+  onUpdateRoom: (id: string, data: Partial<Room>) => Promise<void>,
+  onBack: () => void
+}) => {
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(rooms[0]?.id || null);
+  const [filter, setFilter] = useState<'All' | 'Active' | 'Maintenance'>('All');
+  
+  const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+  
+  // Local state for editing
+  const [editName, setEditName] = useState('');
+  const [editDept, setEditDept] = useState('');
+  const [editCapacity, setEditCapacity] = useState(0);
+  const [editStatus, setEditStatus] = useState<OperationalStatus>('Active');
+  const [editAmenities, setEditAmenities] = useState<string[]>([]);
+  const [editImage, setEditImage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (selectedRoom) {
+      setEditName(selectedRoom.name);
+      setEditDept(selectedRoom.department);
+      setEditCapacity(selectedRoom.capacity);
+      setEditStatus(selectedRoom.operationalStatus);
+      setEditAmenities(selectedRoom.amenities);
+      setEditImage(selectedRoom.image);
+    }
+  }, [selectedRoom]);
+
+  const handleSave = async () => {
+    if (!selectedRoomId) return;
+    setIsSaving(true);
+    await onUpdateRoom(selectedRoomId, {
+      name: editName,
+      department: editDept,
+      capacity: editCapacity,
+      operationalStatus: editStatus,
+      amenities: editAmenities,
+      image: editImage
+    });
+    setIsSaving(false);
+  };
+
+  const filteredRooms = rooms.filter(r => {
+    if (filter === 'All') return true;
+    if (filter === 'Active') return r.operationalStatus === 'Active';
+    if (filter === 'Maintenance') return r.operationalStatus === 'Maintenance';
+    return true;
+  });
+
+  const availableAmenities = [
+    { id: 'Eduroam', icon: <Wifi size={14} />, label: 'Eduroam' },
+    { id: 'Tomadas', icon: <Plug size={14} />, label: 'Tomadas' },
+    { id: 'Smart Screen', icon: <Monitor size={14} />, label: 'Smart Screen' },
+    { id: 'Projetor', icon: <Projector size={14} />, label: 'Projetor' },
+    { id: 'Ar Condicionado', icon: <Wind size={14} />, label: 'Ar Condicionado' },
+  ];
+
+  const toggleAmenity = (id: string) => {
+    setEditAmenities(prev => 
+      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
+    );
+  };
+
+  return (
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
+      {/* Header */}
+      <div className="bg-white border-b border-slate-200 p-6 md:p-8 shrink-0">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={onBack}
+              className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Gestão de Salas</h1>
+              <p className="text-slate-500 mt-1">Controlo em tempo real sobre os espaços de aprendizagem.</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+            <button 
+              onClick={() => setFilter('All')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'All' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Todas
+            </button>
+            <button 
+              onClick={() => setFilter('Active')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Active' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Ativas
+            </button>
+            <button 
+              onClick={() => setFilter('Maintenance')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Maintenance' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Manutenção
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full">
+        {/* Room List */}
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Nome da Sala</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Departamento</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Estado</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Capacidade</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredRooms.map((room) => (
+                  <tr 
+                    key={room.id} 
+                    onClick={() => setSelectedRoomId(room.id)}
+                    className={`cursor-pointer transition-colors ${selectedRoomId === room.id ? 'bg-primary/5' : 'hover:bg-slate-50'}`}
+                  >
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
+                          room.operationalStatus === 'Active' ? 'bg-emerald-100 text-emerald-600' :
+                          room.operationalStatus === 'Maintenance' ? 'bg-amber-100 text-amber-600' :
+                          'bg-slate-100 text-slate-400'
+                        }`}>
+                          <Building2 size={20} />
+                        </div>
+                        <span className="font-bold text-slate-900">{room.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-sm text-slate-500">{room.department}</td>
+                    <td className="px-6 py-5">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                        room.operationalStatus === 'Active' ? 'bg-emerald-100 text-emerald-600' :
+                        room.operationalStatus === 'Maintenance' ? 'bg-amber-100 text-amber-600' :
+                        'bg-slate-100 text-slate-500'
+                      }`}>
+                        <div className={`h-1.5 w-1.5 rounded-full ${
+                          room.operationalStatus === 'Active' ? 'bg-emerald-500' :
+                          room.operationalStatus === 'Maintenance' ? 'bg-amber-500' :
+                          'bg-slate-400'
+                        }`} />
+                        {room.operationalStatus === 'Active' ? 'Ativa' : 
+                         room.operationalStatus === 'Maintenance' ? 'Manutenção' : 'Inativa'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5 text-sm font-medium text-slate-700">{room.capacity} pax</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Edit Panel */}
+        <div className="w-full md:w-96 bg-white border-l border-slate-200 overflow-y-auto p-8">
+          {selectedRoom ? (
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Editar Detalhes</h2>
+                <p className="text-sm text-slate-500">A editar "{selectedRoom.name}"</p>
+              </div>
+
+              {/* Image Section */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Imagem da Sala</label>
+                <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 border-2 border-dashed border-slate-200 group">
+                  {editImage ? (
+                    <>
+                      <img src={editImage} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button 
+                          onClick={() => setEditImage('')}
+                          className="p-2 bg-white rounded-full text-rose-500 hover:scale-110 transition-transform"
+                        >
+                          <Trash2 size={20} />
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                      <Upload size={32} className="mb-2" />
+                      <span className="text-xs font-medium">Upload de Foto</span>
+                    </div>
+                  )}
+                  <input 
+                    type="text" 
+                    placeholder="URL da Imagem..."
+                    value={editImage}
+                    onChange={(e) => setEditImage(e.target.value)}
+                    className="absolute bottom-2 left-2 right-2 bg-white/90 backdrop-blur-sm border-none rounded-lg text-[10px] px-2 py-1 focus:ring-0"
+                  />
+                </div>
+              </div>
+
+              {/* Form Fields */}
+              <div className="space-y-5">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Nome da Sala</label>
+                  <input 
+                    type="text" 
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full rounded-xl border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Departamento</label>
+                  <select 
+                    value={editDept}
+                    onChange={(e) => setEditDept(e.target.value)}
+                    className="w-full rounded-xl border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                  >
+                    <option value="Departamento de Engenharia">Departamento de Engenharia</option>
+                    <option value="Departamento de Informática">Departamento de Informática</option>
+                    <option value="Departamento de Artes">Departamento de Artes</option>
+                    <option value="Biblioteca Geral">Biblioteca Geral</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Capacidade (pax)</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Users size={18} />
+                    </div>
+                    <input 
+                      type="number" 
+                      value={editCapacity}
+                      onChange={(e) => setEditCapacity(parseInt(e.target.value))}
+                      className="w-full pl-11 rounded-xl border-slate-200 bg-slate-50 text-sm font-bold focus:border-primary focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Amenities */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Comodidades</label>
+                <div className="flex flex-wrap gap-2">
+                  {availableAmenities.map((amenity) => (
+                    <button
+                      key={amenity.id}
+                      onClick={() => toggleAmenity(amenity.id)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                        editAmenities.includes(amenity.id)
+                          ? 'bg-primary/10 border-primary text-primary'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      {amenity.icon}
+                      {amenity.label}
+                      {editAmenities.includes(amenity.id) && <Check size={12} />}
+                    </button>
+                  ))}
+                  <button className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-50 border border-slate-200 text-slate-400 hover:bg-slate-100 transition-all">
+                    <Plus size={12} />
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Control */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Controlo de Estado</label>
+                <div className="space-y-2">
+                  <button 
+                    onClick={() => setEditStatus('Active')}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
+                      editStatus === 'Active' 
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900' 
+                        : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 size={20} className={editStatus === 'Active' ? 'text-emerald-600' : 'text-slate-300'} />
+                      <span className="text-sm font-bold">Ativar Sala</span>
+                    </div>
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                      editStatus === 'Active' ? 'border-emerald-600' : 'border-slate-200'
+                    }`}>
+                      {editStatus === 'Active' && <div className="h-2.5 w-2.5 rounded-full bg-emerald-600" />}
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => setEditStatus('Maintenance')}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
+                      editStatus === 'Maintenance' 
+                        ? 'bg-amber-50 border-amber-500 text-amber-900' 
+                        : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Settings size={20} className={editStatus === 'Maintenance' ? 'text-amber-600' : 'text-slate-300'} />
+                      <span className="text-sm font-bold">Manutenção</span>
+                    </div>
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                      editStatus === 'Maintenance' ? 'border-amber-600' : 'border-slate-200'
+                    }`}>
+                      {editStatus === 'Maintenance' && <div className="h-2.5 w-2.5 rounded-full bg-amber-600" />}
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => setEditStatus('Inactive')}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
+                      editStatus === 'Inactive' 
+                        ? 'bg-slate-50 border-slate-500 text-slate-900' 
+                        : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <X size={20} className={editStatus === 'Inactive' ? 'text-slate-600' : 'text-slate-300'} />
+                      <span className="text-sm font-bold">Desativar</span>
+                    </div>
+                    <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                      editStatus === 'Inactive' ? 'border-slate-600' : 'border-slate-200'
+                    }`}>
+                      {editStatus === 'Inactive' && <div className="h-2.5 w-2.5 rounded-full bg-slate-600" />}
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4">
+                <button 
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex-1 bg-primary text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSaving ? <Loader2 size={18} className="animate-spin" /> : 'Guardar Alterações'}
+                </button>
+                <button 
+                  onClick={() => setSelectedRoomId(null)}
+                  className="px-6 border border-slate-200 text-slate-600 py-3.5 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+              <div className="h-20 w-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300">
+                <ImageIcon size={40} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Nenhuma sala selecionada</h3>
+                <p className="text-sm text-slate-500 max-w-[200px] mx-auto">Selecione uma sala na lista para editar os seus detalhes.</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -284,7 +675,7 @@ const SchedulesView = ({
       }
       
       const d = new Date(currentDate);
-      d.setDate(d.getDate() - d.getDay() + 1 + dragStart.day);
+      d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1) + dragStart.day);
       setBookingDate(d.toISOString().split('T')[0]);
       setBookingStartTime(startTimeStr);
       setBookingDuration(durationStr);
@@ -330,7 +721,7 @@ const SchedulesView = ({
     .map(res => {
       const resDate = new Date(res.date);
       const weekStart = new Date(currentDate);
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+      weekStart.setDate(weekStart.getDate() - (weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1));
       weekStart.setHours(0, 0, 0, 0);
       
       const diffTime = resDate.getTime() - weekStart.getTime();
@@ -365,7 +756,7 @@ const SchedulesView = ({
 
   const getWeekRange = () => {
     const start = new Date(currentDate);
-    start.setDate(start.getDate() - start.getDay() + 1);
+    start.setDate(start.getDate() - (start.getDay() === 0 ? 6 : start.getDay() - 1));
     const end = new Date(start);
     end.setDate(end.getDate() + 6);
     return `${start.toLocaleDateString('pt-PT')} - ${end.toLocaleDateString('pt-PT')}`;
@@ -435,8 +826,11 @@ const SchedulesView = ({
                           }`}>
                             <DoorOpen size={16} />
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-900 truncate">{room.name}</p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-bold text-slate-900 truncate">{room.name}</p>
+                              <span className="text-[9px] font-bold text-slate-400 shrink-0">{room.capacity} pax</span>
+                            </div>
                             <p className="text-[10px] text-slate-500 truncate">{room.department}</p>
                           </div>
                         </button>
@@ -505,7 +899,7 @@ const SchedulesView = ({
                 <span className={`text-lg font-bold ${i === 1 ? 'text-primary' : 'text-slate-900'}`}>
                   {(() => {
                     const d = new Date(currentDate);
-                    d.setDate(d.getDate() - d.getDay() + 1 + i);
+                    d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1) + i);
                     return d.getDate();
                   })()}
                 </span>
@@ -595,7 +989,7 @@ const SchedulesView = ({
 };
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice'>('map');
+  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice' | 'manage-rooms'>('map');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('101');
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -650,8 +1044,9 @@ export default function App() {
         // Map database rooms to frontend Room interface
         const mappedRooms = roomsData.map((r: any) => ({
           ...r,
-          amenities: ['Eduroam', 'Tomadas'], // Default amenities for now
-          image: 'https://picsum.photos/seed/' + r.id + '/800/600',
+          operationalStatus: r.operational_status || 'Active',
+          amenities: r.amenities ? JSON.parse(r.amenities) : ['Eduroam', 'Tomadas'],
+          image: r.image || 'https://picsum.photos/seed/' + r.id + '/800/600',
           top: r.id === '101' ? '20%' : r.id === '102' ? '20%' : r.id === '201' ? '50%' : '70%',
           left: r.id === '101' ? '15%' : r.id === '102' ? '30%' : r.id === '201' ? '45%' : '70%'
         }));
@@ -982,6 +1377,27 @@ export default function App() {
     }
   };
 
+  const handleUpdateRoom = async (roomId: string, updatedData: Partial<Room>) => {
+    try {
+      const response = await fetch(`/api/rooms/${roomId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      });
+
+      if (!response.ok) throw new Error("Failed to update room");
+
+      setRooms(prev => prev.map(r => r.id === roomId ? { ...r, ...updatedData } : r));
+      setBookingStatus('success');
+      setBookingMessage('Sala atualizada com sucesso.');
+      setTimeout(() => setBookingStatus('idle'), 3000);
+    } catch (error) {
+      console.error("Update failed:", error);
+      setBookingStatus('error');
+      setBookingMessage('Erro ao atualizar a sala.');
+    }
+  };
+
   const getStatusColor = (status: RoomStatus) => {
     switch (status) {
       case 'Available': return 'bg-emerald-500';
@@ -1075,8 +1491,11 @@ export default function App() {
                           }`}>
                             <DoorOpen size={16} />
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-900 truncate">{room.name}</p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-bold text-slate-900 truncate">{room.name}</p>
+                              <span className="text-[9px] font-bold text-slate-400 shrink-0">{room.capacity} pax</span>
+                            </div>
                             <p className="text-[10px] text-slate-500 truncate">{room.department}</p>
                           </div>
                         </button>
@@ -1355,11 +1774,18 @@ export default function App() {
                   )}
                 </div>
               </motion.div>
-            ) : (
+            ) : currentView === 'backoffice' ? (
               <BackofficeView 
                 reservations={reservations}
                 users={allUsers}
                 onUpdateStatus={handleUpdateReservationStatus}
+                onManageRooms={() => setCurrentView('manage-rooms')}
+              />
+            ) : (
+              <ManageRoomsView 
+                rooms={rooms}
+                onUpdateRoom={handleUpdateRoom}
+                onBack={() => setCurrentView('backoffice')}
               />
             )}
           </AnimatePresence>
@@ -1379,7 +1805,12 @@ export default function App() {
               >
                 <div className="mb-6 flex items-start justify-between">
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900">{selectedRoom.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-bold text-slate-900">{selectedRoom.name}</h3>
+                      <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">
+                        {selectedRoom.capacity} pax
+                      </span>
+                    </div>
                     <p className="text-sm text-slate-500">{selectedRoom.department}</p>
                   </div>
                   <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
@@ -1404,7 +1835,7 @@ export default function App() {
                   <div>
                     <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">Comodidades</h4>
                     <div className="grid grid-cols-2 gap-3">
-                      <Amenity icon={<Users size={16} />} label={`Capacidade: ${selectedRoom.capacity}`} />
+                      <Amenity icon={<Users size={16} />} label={`${selectedRoom.capacity} pax`} />
                       <Amenity icon={<Wifi size={16} />} label="Eduroam" />
                       <Amenity icon={<Plug size={16} />} label="Tomadas" />
                       <Amenity icon={<Monitor size={16} />} label="Ecrã Inteligente" />
@@ -1413,111 +1844,122 @@ export default function App() {
 
                   <div className="border-t border-slate-100 pt-4">
                     <h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">Reservar este espaço</h4>
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-600">Assunto / Porquê</label>
-                        <input 
-                          type="text" 
-                          placeholder="Ex: Estudo de Grupo, Reunião..."
-                          value={bookingSubject}
-                          onChange={(e) => setBookingSubject(e.target.value)}
-                          className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
-                        />
+                    {selectedRoom.operationalStatus !== 'Active' ? (
+                      <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-sm font-medium flex items-center gap-3">
+                        <AlertCircle size={20} />
+                        {selectedRoom.operationalStatus === 'Maintenance' 
+                          ? 'Esta sala encontra-se em manutenção e não pode ser reservada.' 
+                          : 'Esta sala encontra-se inativa.'}
                       </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-slate-600">Selecionar Data</label>
-                        <input 
-                          type="date" 
-                          value={bookingDate}
-                          onChange={(e) => setBookingDate(e.target.value)}
-                          className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
-                        />
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3">
+                    ) : (
+                      <div className="space-y-4">
                         <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-slate-600">Hora de Início</label>
-                          <select 
-                            value={bookingStartTime}
-                            onChange={(e) => setBookingStartTime(e.target.value)}
+                          <label className="text-xs font-medium text-slate-600">Assunto / Porquê</label>
+                          <input 
+                            type="text" 
+                            placeholder="Ex: Estudo de Grupo, Reunião..."
+                            value={bookingSubject}
+                            onChange={(e) => setBookingSubject(e.target.value)}
                             className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
-                          >
-                            {Array.from({ length: 40 }, (_, i) => {
-                              const h = Math.floor(i / 4) + 8;
-                              const m = (i % 4) * 15;
-                              const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                              return <option key={time} value={time}>{time}</option>;
-                            })}
-                          </select>
+                          />
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-slate-600">Duração</label>
-                          <select 
-                            value={bookingDuration}
-                            onChange={(e) => setBookingDuration(e.target.value)}
-                            className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
-                          >
-                            <option value="15 Minutos">15 Minutos</option>
-                            <option value="30 Minutos">30 Minutos</option>
-                            <option value="45 Minutos">45 Minutos</option>
-                            <option value="1 Hora">1 Hora</option>
-                            <option value="1 Hora e 15">1 Hora e 15</option>
-                            <option value="1 Hora e 30">1 Hora e 30</option>
-                            <option value="1 Hora e 45">1 Hora e 45</option>
-                            <option value="2 Horas">2 Horas</option>
-                            <option value="2 Horas e 15">2 Horas e 15</option>
-                            <option value="2 Horas e 30">2 Horas e 30</option>
-                            <option value="2 Horas e 45">2 Horas e 45</option>
-                            <option value="3 Horas">3 Horas</option>
-                            <option value="4 Horas">4 Horas</option>
-                            {/* Fallback for custom drag durations */}
-                            {!["15 Minutos", "30 Minutos", "45 Minutos", "1 Hora", "1 Hora e 15", "1 Hora e 30", "1 Hora e 45", "2 Horas", "2 Horas e 15", "2 Horas e 30", "2 Horas e 45", "3 Horas", "4 Horas"].includes(bookingDuration) && (
-                              <option value={bookingDuration}>{bookingDuration}</option>
-                            )}
-                          </select>
-                        </div>
-                      </div>
 
-                      <button 
-                        onClick={() => handleConfirmBooking()}
-                        disabled={
-                          bookingStatus === 'checking' || 
-                          getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
-                          (() => {
-                            const now = new Date();
-                            const [h, m] = bookingStartTime.split(':').map(Number);
-                            const bDate = new Date(bookingDate + 'T00:00:00');
-                            bDate.setHours(h, m, 0, 0);
-                            return bDate < now;
-                          })()
-                        }
-                        className={`w-full rounded-xl py-3 text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
-                          getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
-                          (() => {
-                            const now = new Date();
-                            const [h, m] = bookingStartTime.split(':').map(Number);
-                            const bDate = new Date(bookingDate + 'T00:00:00');
-                            bDate.setHours(h, m, 0, 0);
-                            return bDate < now;
-                          })()
-                            ? 'bg-slate-300 cursor-not-allowed shadow-none' 
-                            : 'bg-primary shadow-primary/25 hover:bg-primary/90'
-                        }`}
-                      >
-                        {bookingStatus === 'checking' ? (
-                          <>
-                            <Loader2 size={18} className="animate-spin" />
-                            A verificar...
-                          </>
-                        ) : (
-                          'Confirmar Reserva'
-                        )}
-                      </button>
-                      <p className="text-center text-[10px] text-slate-400">
-                        Validação necessária via código QR na entrada da sala.
-                      </p>
-                    </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-slate-600">Selecionar Data</label>
+                          <input 
+                            type="date" 
+                            value={bookingDate}
+                            onChange={(e) => setBookingDate(e.target.value)}
+                            className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Hora de Início</label>
+                            <select 
+                              value={bookingStartTime}
+                              onChange={(e) => setBookingStartTime(e.target.value)}
+                              className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                            >
+                              {Array.from({ length: 40 }, (_, i) => {
+                                const h = Math.floor(i / 4) + 8;
+                                const m = (i % 4) * 15;
+                                const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                return <option key={time} value={time}>{time}</option>;
+                              })}
+                            </select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Duração</label>
+                            <select 
+                              value={bookingDuration}
+                              onChange={(e) => setBookingDuration(e.target.value)}
+                              className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                            >
+                              <option value="15 Minutos">15 Minutos</option>
+                              <option value="30 Minutos">30 Minutos</option>
+                              <option value="45 Minutos">45 Minutos</option>
+                              <option value="1 Hora">1 Hora</option>
+                              <option value="1 Hora e 15">1 Hora e 15</option>
+                              <option value="1 Hora e 30">1 Hora e 30</option>
+                              <option value="1 Hora e 45">1 Hora e 45</option>
+                              <option value="2 Horas">2 Horas</option>
+                              <option value="2 Horas e 15">2 Horas e 15</option>
+                              <option value="2 Horas e 30">2 Horas e 30</option>
+                              <option value="2 Horas e 45">2 Horas e 45</option>
+                              <option value="3 Horas">3 Horas</option>
+                              <option value="4 Horas">4 Horas</option>
+                              {/* Fallback for custom drag durations */}
+                              {!["15 Minutos", "30 Minutos", "45 Minutos", "1 Hora", "1 Hora e 15", "1 Hora e 30", "1 Hora e 45", "2 Horas", "2 Horas e 15", "2 Horas e 30", "2 Horas e 45", "3 Horas", "4 Horas"].includes(bookingDuration) && (
+                                <option value={bookingDuration}>{bookingDuration}</option>
+                              )}
+                            </select>
+                          </div>
+                        </div>
+
+                        <button 
+                          onClick={() => handleConfirmBooking()}
+                          disabled={
+                            bookingStatus === 'checking' || 
+                            selectedRoom.operationalStatus !== 'Active' ||
+                            getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                            (() => {
+                              const now = new Date();
+                              const [h, m] = bookingStartTime.split(':').map(Number);
+                              const bDate = new Date(bookingDate + 'T00:00:00');
+                              bDate.setHours(h, m, 0, 0);
+                              return bDate < now;
+                            })()
+                          }
+                          className={`w-full rounded-xl py-3 text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
+                            selectedRoom.operationalStatus !== 'Active' ||
+                            getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                            (() => {
+                              const now = new Date();
+                              const [h, m] = bookingStartTime.split(':').map(Number);
+                              const bDate = new Date(bookingDate + 'T00:00:00');
+                              bDate.setHours(h, m, 0, 0);
+                              return bDate < now;
+                            })()
+                              ? 'bg-slate-300 cursor-not-allowed shadow-none' 
+                              : 'bg-primary shadow-primary/25 hover:bg-primary/90'
+                          }`}
+                        >
+                          {bookingStatus === 'checking' ? (
+                            <>
+                              <Loader2 size={18} className="animate-spin" />
+                              A verificar...
+                            </>
+                          ) : (
+                            'Confirmar Reserva'
+                          )}
+                        </button>
+                        <p className="text-center text-[10px] text-slate-400">
+                          Validação necessária via código QR na entrada da sala.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -1744,9 +2186,9 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMark
 
 function Amenity({ icon, label }: { icon: React.ReactNode, label: string }) {
   return (
-    <div className="flex items-center gap-2 text-slate-600">
-      <span className="text-slate-400">{icon}</span>
-      <span className="text-xs">{label}</span>
+    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 text-slate-600 transition-all hover:bg-white hover:shadow-sm">
+      <div className="text-primary shrink-0">{icon}</div>
+      <span className="text-[11px] font-bold truncate">{label}</span>
     </div>
   );
 }
