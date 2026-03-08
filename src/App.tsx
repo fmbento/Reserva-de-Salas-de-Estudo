@@ -60,8 +60,118 @@ interface UserData {
   id: number;
   name: string;
   email: string;
-  permission_level: number;
+  role: 'user' | 'librarian' | 'admin';
 }
+
+const BackofficeView = ({ 
+  reservations, 
+  users,
+  onUpdateStatus 
+}: { 
+  reservations: Reservation[], 
+  users: UserData[],
+  onUpdateStatus: (id: string, status: string) => void 
+}) => {
+  const now = new Date();
+  
+  const futureReservations = reservations.filter(res => {
+    const resDateTime = new Date(`${res.date}T${res.startTime}`);
+    // We consider it "future" if it starts after now or is today
+    // To be precise, let's say it hasn't started yet or started recently
+    return resDateTime >= now || res.date === now.toISOString().split('T')[0];
+  }).sort((a, b) => new Date(`${a.date}T${a.startTime}`).getTime() - new Date(`${b.date}T${b.startTime}`).getTime());
+
+  return (
+    <div className="flex-1 overflow-auto p-6 md:p-10">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Gestão de Reservas</h1>
+            <p className="text-slate-500 mt-1">Aprovação e monitorização de pedidos de salas (Apenas futuras).</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sala</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Utilizador</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Data / Hora</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Assunto</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {futureReservations.map((res) => {
+                const user = users.find(u => u.id === res.userId);
+                return (
+                  <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-slate-900">{res.roomName}</div>
+                      <div className="text-xs text-slate-500">ID: {res.roomId}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-slate-900">{user?.name || 'Utilizador Desconhecido'}</div>
+                      <div className="text-xs text-slate-500">{user?.email || 'N/A'}</div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      <div>{res.date}</div>
+                      <div className="text-xs text-slate-400">{res.startTime} ({res.duration})</div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      {res.subject || 'Sem assunto'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        res.status === 'Pending' ? 'bg-amber-100 text-amber-800' :
+                        res.status === 'Confirmed' || res.status === 'Occupied' ? 'bg-emerald-100 text-emerald-800' :
+                        'bg-slate-100 text-slate-800'
+                      }`}>
+                        {res.status === 'Pending' ? 'Pendente' : 
+                         res.status === 'Confirmed' ? 'Confirmada' :
+                         res.status === 'Occupied' ? 'Ocupada' :
+                         res.status === 'Cancelled' ? 'Cancelada' : res.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right space-x-2">
+                      {res.status === 'Pending' && (
+                        <>
+                          <button 
+                            onClick={() => onUpdateStatus(res.id, 'Confirmed')}
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                            title="Aprovar"
+                          >
+                            <CheckCircle2 className="h-5 w-5" />
+                          </button>
+                          <button 
+                            onClick={() => onUpdateStatus(res.id, 'Cancelled')}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Recusar"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {futureReservations.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                    Não existem reservas futuras registadas.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const SchedulesView = ({ 
   rooms, 
@@ -485,11 +595,13 @@ const SchedulesView = ({
 };
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules'>('map');
+  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice'>('map');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('101');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
+  const [allUsers, setAllUsers] = useState<UserData[]>([]);
+  const [showUserSwitcher, setShowUserSwitcher] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -513,19 +625,27 @@ export default function App() {
     newStartTime?: string;
   }>({ isOpen: false, type: 'room', originalDuration: 0, newDuration: 0 });
 
+  useEffect(() => {
+    console.log("Current allUsers state:", allUsers);
+  }, [allUsers]);
+
   // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [roomsRes, reservationsRes, userRes] = await Promise.all([
+        const [roomsRes, reservationsRes, userRes, allUsersRes] = await Promise.all([
           fetch('/api/rooms'),
           fetch('/api/reservations'),
-          fetch('/api/user/me')
+          fetch('/api/user/me'),
+          fetch('/api/users')
         ]);
 
         const roomsData = await roomsRes.json();
         const reservationsData = await reservationsRes.json();
         const userData = await userRes.json();
+        const allUsersData = await allUsersRes.json();
+        console.log("Fetched all users:", allUsersData);
+        setAllUsers(allUsersData);
 
         // Map database rooms to frontend Room interface
         const mappedRooms = roomsData.map((r: any) => ({
@@ -763,7 +883,15 @@ export default function App() {
         })
       });
 
-      if (!response.ok) throw new Error("Failed to create reservation");
+      if (!response.ok) {
+        if (response.status === 409) {
+          const errorData = await response.json();
+          setBookingStatus('error');
+          setBookingMessage(errorData.error);
+          return;
+        }
+        throw new Error("Failed to create reservation");
+      }
 
       const newRes = await response.json();
       
@@ -774,6 +902,7 @@ export default function App() {
         id: r.id.toString(),
         roomId: r.room_id,
         roomName: r.room_name,
+        userId: r.user_id,
         date: r.date,
         startTime: r.start_time,
         duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
@@ -814,6 +943,42 @@ export default function App() {
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error) {
       console.error("Delete failed:", error);
+    }
+  };
+
+  const handleSwitchUser = async (email: string) => {
+    try {
+      const res = await fetch(`/api/user/me?email=${email}`);
+      const userData = await res.json();
+      setCurrentUser(userData);
+      setShowUserSwitcher(false);
+      
+      if (userData.role === 'librarian' || userData.role === 'admin') {
+        setCurrentView('backoffice');
+      } else {
+        setCurrentView('map');
+      }
+    } catch (error) {
+      console.error("Failed to switch user:", error);
+    }
+  };
+
+  const handleUpdateReservationStatus = async (id: string, status: string) => {
+    try {
+      const response = await fetch(`/api/reservations/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) throw new Error("Failed to update status");
+
+      setReservations(prev => prev.map(res => res.id === id ? { ...res, status: status as any } : res));
+      setBookingStatus('success');
+      setBookingMessage(`Reserva ${status === 'Confirmed' ? 'aprovada' : 'recusada'} com sucesso.`);
+      setTimeout(() => setBookingStatus('idle'), 3000);
+    } catch (error) {
+      console.error("Update failed:", error);
     }
   };
 
@@ -931,9 +1096,44 @@ export default function App() {
             <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
               <Bell className="h-5 w-5" />
             </button>
-            <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
-              <User className="h-5 w-5" />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={() => setShowUserSwitcher(!showUserSwitcher)}
+                className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+              >
+                <User className="h-5 w-5" />
+              </button>
+              
+              <AnimatePresence>
+                {showUserSwitcher && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-[100]"
+                  >
+                    <div className="px-4 py-2 border-b border-slate-100 mb-1">
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Alterar Utilizador</p>
+                    </div>
+                    {allUsers.map(u => (
+                      <button
+                        key={u.id}
+                        onClick={() => handleSwitchUser(u.email)}
+                        className={`w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors flex flex-col ${currentUser?.id === u.id ? 'bg-primary/5' : ''}`}
+                      >
+                        <span className={`text-sm font-medium ${currentUser?.id === u.id ? 'text-primary' : 'text-slate-700'}`}>
+                          {u.name}
+                        </span>
+                        <span className="text-xs text-slate-400">{u.email}</span>
+                        <span className="text-[10px] mt-0.5 px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md self-start uppercase font-bold">
+                          {u.role}
+                        </span>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </header>
@@ -966,6 +1166,14 @@ export default function App() {
                 active={currentView === 'reservations'} 
                 onClick={() => setCurrentView('reservations')}
               />
+              {(currentUser?.role === 'librarian' || currentUser?.role === 'admin') && (
+                <SidebarLink 
+                  icon={<CheckCircle2 size={20} />} 
+                  label="Backoffice" 
+                  active={currentView === 'backoffice'} 
+                  onClick={() => setCurrentView('backoffice')}
+                />
+              )}
               <SidebarLink icon={<Library size={20} />} label="Info. Biblioteca" />
               <SidebarLink icon={<Settings size={20} />} label="Definições" />
             </div>
@@ -1050,7 +1258,7 @@ export default function App() {
                 setBookingDuration={setBookingDuration}
                 onNewBooking={() => setCurrentView('map')}
               />
-            ) : (
+            ) : currentView === 'reservations' ? (
               <motion.div 
                 key="reservations-view"
                 initial={{ opacity: 0, y: 20 }}
@@ -1064,26 +1272,28 @@ export default function App() {
                     <p className="text-slate-500">Consulte e gira as suas reservas de salas de estudo.</p>
                   </div>
 
-                  {reservations.length > 0 ? (
+                  {reservations.filter(r => r.userId === currentUser?.id).length > 0 ? (
                     <div className="space-y-10">
                       {/* Process reservations with current time logic */}
                       {(() => {
                         const now = new Date();
                         
-                        const processedReservations = reservations.map(res => {
-                          const resDateTime = new Date(`${res.date}T${res.startTime}`);
-                          
-                          // If reservation is in the past
-                          if (resDateTime < now) {
-                            if (res.status === 'Confirmed' || res.status === 'Occupied') {
-                              return { ...res, status: 'Completed' as const };
+                        const processedReservations = reservations
+                          .filter(r => r.userId === currentUser?.id)
+                          .map(res => {
+                            const resDateTime = new Date(`${res.date}T${res.startTime}`);
+                            
+                            // If reservation is in the past
+                            if (resDateTime < now) {
+                              if (res.status === 'Confirmed' || res.status === 'Occupied') {
+                                return { ...res, status: 'Completed' as const };
+                              }
+                              if (res.status === 'Pending') {
+                                return { ...res, status: 'Cancelled' as const };
+                              }
                             }
-                            if (res.status === 'Pending') {
-                              return { ...res, status: 'Cancelled' as const };
-                            }
-                          }
-                          return res;
-                        });
+                            return res;
+                          });
 
                         const active = processedReservations
                           .filter(r => r.status === 'Pending' || r.status === 'Confirmed' || r.status === 'Occupied')
@@ -1145,6 +1355,12 @@ export default function App() {
                   )}
                 </div>
               </motion.div>
+            ) : (
+              <BackofficeView 
+                reservations={reservations}
+                users={allUsers}
+                onUpdateStatus={handleUpdateReservationStatus}
+              />
             )}
           </AnimatePresence>
         </main>

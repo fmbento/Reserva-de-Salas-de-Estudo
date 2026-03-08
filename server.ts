@@ -10,7 +10,14 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const db = new Database("database.sqlite");
+let db: any;
+try {
+  db = new Database("database.sqlite");
+  console.log("Database initialized successfully");
+} catch (error) {
+  console.error("Failed to initialize database:", error);
+  process.exit(1);
+}
 
 // Initialize database tables
 db.exec(`
@@ -18,7 +25,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    permission_level INTEGER DEFAULT 1
+    role TEXT DEFAULT 'user' -- 'user', 'librarian', 'admin'
   );
 
   CREATE TABLE IF NOT EXISTS rooms (
@@ -46,19 +53,30 @@ db.exec(`
 
 // Seed initial data
 const seedData = () => {
-  const userCount = db.prepare("SELECT count(*) as count FROM users").get() as { count: number };
-  if (userCount.count === 0) {
-    db.prepare("INSERT INTO users (name, email, permission_level) VALUES (?, ?, ?)").run(
-      "Test User", "filben@gmail.com", 1
-    );
+  const users = [
+    { name: "Utilizador Teste 1", email: "filben@gmail.com", role: "user" },
+    { name: "Utilizador Teste 2", email: "teste2@ua.pt", role: "user" },
+    { name: "Bibliotecário 01", email: "bib01@ua.pt", role: "librarian" },
+    { name: "Administrador do Sistema 01", email: "admin01@ua.pt", role: "admin" },
+  ];
+
+  console.log("Seeding users...");
+  const insertUser = db.prepare("INSERT OR REPLACE INTO users (name, email, role) VALUES (?, ?, ?)");
+  users.forEach(u => {
+    const result = insertUser.run(u.name, u.email, u.role);
+    console.log(`User seed result for ${u.email}: changes=${result.changes}`);
+  });
+
+  const allUsersInDb = db.prepare("SELECT * FROM users").all();
+  console.log("All users in DB:", allUsersInDb);
+  if (allUsersInDb.length < 4) {
+    console.warn(`Warning: Only ${allUsersInDb.length} users found in DB. Expected at least 4.`);
   }
 
-  // Add the second test user if not exists
-  const user2 = db.prepare("SELECT * FROM users WHERE email = ?").get("teste2@ua.pt");
-  if (!user2) {
-    db.prepare("INSERT INTO users (name, email, permission_level) VALUES (?, ?, ?)").run(
-      "Teste Dois", "teste2@ua.pt", 1
-    );
+  const u2 = db.prepare("SELECT id FROM users WHERE email = ?").get("teste2@ua.pt") as { id: number } | undefined;
+  if (!u2) {
+    console.error("Critical error: Seed user 'teste2@ua.pt' not found after insertion.");
+    return;
   }
 
   const roomCount = db.prepare("SELECT count(*) as count FROM rooms").get() as { count: number };
@@ -76,7 +94,6 @@ const seedData = () => {
 
   const reservationCount = db.prepare("SELECT count(*) as count FROM reservations").get() as { count: number };
   if (reservationCount.count <= 2) { // If only initial mock data exists, add more
-    const u2 = db.prepare("SELECT id FROM users WHERE email = ?").get("teste2@ua.pt") as { id: number };
     const extraReservations = [
       { room_id: '101', user_id: u2.id, date: '2026-03-05', start_time: '14:00', duration: 60, subject: 'Estudo Individual', status: 'Occupied' },
       { room_id: '202', user_id: u2.id, date: '2026-03-05', start_time: '16:00', duration: 90, subject: 'Projeto de Redes', status: 'Pending' },
@@ -98,11 +115,21 @@ const seedData = () => {
   }
 };
 
-seedData();
+try {
+  seedData();
+  console.log("Database seeded successfully");
+} catch (error) {
+  console.error("Error seeding database:", error);
+}
 
 async function startServer() {
   const app = express();
   app.use(express.json());
+
+  // Health check endpoint
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
 
   // API Routes
   app.get("/api/rooms", (req, res) => {
@@ -122,11 +149,45 @@ async function startServer() {
 
   app.post("/api/reservations", (req, res) => {
     const { room_id, user_id, date, start_time, duration, subject } = req.body;
+    const uid = user_id || 1;
+    
+    const parseTime = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const newStart = parseTime(start_time);
+    const newEnd = newStart + duration;
+
+    // 1. Check for USER conflicts (across all rooms)
+    const userReservations = db.prepare("SELECT * FROM reservations WHERE user_id = ? AND date = ? AND status != 'Cancelled'").all(uid, date);
+    const userConflict = userReservations.find((r: any) => {
+      const rStart = parseTime(r.start_time);
+      const rEnd = rStart + r.duration;
+      return (newStart < rEnd && newEnd > rStart);
+    });
+
+    if (userConflict) {
+      return res.status(409).json({ error: "Já possui uma reserva ativa que se sobrepõe a este horário." });
+    }
+
+    // 2. Check for ROOM conflicts
+    const roomReservations = db.prepare("SELECT * FROM reservations WHERE room_id = ? AND date = ? AND status != 'Cancelled'").all(room_id, date);
+    const roomConflict = roomReservations.find((r: any) => {
+      const rStart = parseTime(r.start_time);
+      const rEnd = rStart + r.duration;
+      return (newStart < rEnd && newEnd > rStart);
+    });
+
+    if (roomConflict) {
+      return res.status(409).json({ error: "Esta sala já está reservada para este horário." });
+    }
+
     try {
       const result = db.prepare(`
         INSERT INTO reservations (room_id, user_id, date, start_time, duration, subject, status) 
         VALUES (?, ?, ?, ?, ?, ?, 'Pending')
-      `).run(room_id, user_id || 1, date, start_time, duration, subject);
+      `).run(room_id, uid, date, start_time, duration, subject);
       
       const newReservation = db.prepare("SELECT * FROM reservations WHERE id = ?").get(result.lastInsertRowid);
       res.status(201).json(newReservation);
@@ -146,9 +207,29 @@ async function startServer() {
   });
 
   app.get("/api/user/me", (req, res) => {
-    // Mocking the current user for now
-    const user = db.prepare("SELECT * FROM users WHERE email = ?").get("filben@gmail.com");
+    const email = req.query.email as string || "filben@gmail.com";
+    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
     res.json(user);
+  });
+
+  app.get("/api/users", (req, res) => {
+    const users = db.prepare("SELECT * FROM users").all();
+    console.log("Serving /api/users request. Count:", users.length);
+    res.json(users);
+  });
+
+  app.patch("/api/reservations/:id/status", (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    try {
+      db.prepare("UPDATE reservations SET status = ? WHERE id = ?").run(status, id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update status" });
+    }
   });
 
   // Vite middleware for development
@@ -167,8 +248,11 @@ async function startServer() {
 
   const PORT = 3000;
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer();
+startServer().catch(err => {
+  console.error("Failed to start server:", err);
+  process.exit(1);
+});
