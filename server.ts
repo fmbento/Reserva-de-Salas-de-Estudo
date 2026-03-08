@@ -54,8 +54,8 @@ db.exec(`
 // Seed initial data
 const seedData = () => {
   const users = [
-    { name: "Utilizador Teste 1", email: "filben@gmail.com", role: "user" },
-    { name: "Utilizador Teste 2", email: "teste2@ua.pt", role: "user" },
+    { name: "Utilizador Teste 1", email: "teste01@ua.pt", role: "user" },
+    { name: "Utilizador Teste 2", email: "teste02@ua.pt", role: "user" },
     { name: "Bibliotecário 01", email: "bib01@ua.pt", role: "librarian" },
     { name: "Administrador do Sistema 01", email: "admin01@ua.pt", role: "admin" },
   ];
