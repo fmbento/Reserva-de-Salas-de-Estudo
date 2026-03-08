@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    container_name: reserva-salas-app
+    restart: always
+    ports:
+      # Mapeia a porta 3002 do host para a 3000 do container
+      - "3002:3000"
+    volumes:
+      # Mapeamento do host para a pasta de dados do container
+      - /home/ubuntu/dockers/GitHub/Reserva-de-Salas-de-Estudo/data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    platform: linux/arm64
