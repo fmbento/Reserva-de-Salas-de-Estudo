@@ -41,6 +41,14 @@ import { motion, AnimatePresence } from 'motion/react';
 type RoomStatus = 'Available' | 'Pending' | 'Occupied';
 type OperationalStatus = 'Active' | 'Maintenance' | 'Inactive';
 
+const AVAILABLE_AMENITIES = [
+  { id: 'Eduroam', icon: <Wifi size={14} />, label: 'Eduroam' },
+  { id: 'Tomadas', icon: <Plug size={14} />, label: 'Tomadas' },
+  { id: 'Smart Screen', icon: <Monitor size={14} />, label: 'Ecrã Inteligente' },
+  { id: 'Projetor', icon: <Projector size={14} />, label: 'Projetor' },
+  { id: 'Ar Condicionado', icon: <Wind size={14} />, label: 'Ar Condicionado' },
+];
+
 interface Room {
   id: string;
   name: string;
@@ -247,14 +255,6 @@ const ManageRoomsView = ({
     return true;
   });
 
-  const availableAmenities = [
-    { id: 'Eduroam', icon: <Wifi size={14} />, label: 'Eduroam' },
-    { id: 'Tomadas', icon: <Plug size={14} />, label: 'Tomadas' },
-    { id: 'Smart Screen', icon: <Monitor size={14} />, label: 'Smart Screen' },
-    { id: 'Projetor', icon: <Projector size={14} />, label: 'Projetor' },
-    { id: 'Ar Condicionado', icon: <Wind size={14} />, label: 'Ar Condicionado' },
-  ];
-
   const toggleAmenity = (id: string) => {
     setEditAmenities(prev => 
       prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
@@ -445,7 +445,7 @@ const ManageRoomsView = ({
               <div className="space-y-3">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Comodidades</label>
                 <div className="flex flex-wrap gap-2">
-                  {availableAmenities.map((amenity) => (
+                  {AVAILABLE_AMENITIES.map((amenity) => (
                     <button
                       key={amenity.id}
                       onClick={() => toggleAmenity(amenity.id)}
@@ -1836,9 +1836,9 @@ export default function App() {
                     <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">Comodidades</h4>
                     <div className="grid grid-cols-2 gap-3">
                       <Amenity icon={<Users size={16} />} label={`${selectedRoom.capacity} pax`} />
-                      <Amenity icon={<Wifi size={16} />} label="Eduroam" />
-                      <Amenity icon={<Plug size={16} />} label="Tomadas" />
-                      <Amenity icon={<Monitor size={16} />} label="Ecrã Inteligente" />
+                      {AVAILABLE_AMENITIES.filter(a => selectedRoom.amenities.includes(a.id)).map(amenity => (
+                        <Amenity key={amenity.id} icon={React.cloneElement(amenity.icon as React.ReactElement, { size: 16 })} label={amenity.label} />
+                      ))}
                     </div>
                   </div>
 
@@ -2184,7 +2184,7 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMark
   );
 }
 
-function Amenity({ icon, label }: { icon: React.ReactNode, label: string }) {
+function Amenity({ icon, label }: { icon: React.ReactNode, label: string, key?: string | number }) {
   return (
     <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 text-slate-600 transition-all hover:bg-white hover:shadow-sm">
       <div className="text-primary shrink-0">{icon}</div>
