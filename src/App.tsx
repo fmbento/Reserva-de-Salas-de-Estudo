@@ -158,6 +158,38 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
       const nextInput = document.getElementById(`otp-${index + 1}`);
       nextInput?.focus();
     }
+
+    // Auto-submit if all digits are filled
+    if (newOtp.every(digit => digit !== '') && newOtp.join('').length === 5) {
+      // Small delay to ensure state is updated and user sees the last digit
+      setTimeout(() => {
+        handleVerifyOtp();
+      }, 100);
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').slice(0, 5);
+    if (!/^\d+$/.test(pastedData)) return;
+
+    const newOtp = [...otp];
+    const digits = pastedData.split('');
+    digits.forEach((digit, idx) => {
+      if (idx < 5) newOtp[idx] = digit;
+    });
+    setOtp(newOtp);
+
+    // Focus last filled input or the next one
+    const lastIdx = Math.min(digits.length - 1, 4);
+    const nextInput = document.getElementById(`otp-${lastIdx}`);
+    nextInput?.focus();
+
+    if (newOtp.every(digit => digit !== '') && newOtp.join('').length === 5) {
+      setTimeout(() => {
+        handleVerifyOtp();
+      }, 100);
+    }
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
@@ -178,7 +210,7 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
           UA
         </div>
         
-        <h1 className="text-2xl font-bold text-slate-900 mb-1">SIRS - UA</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-1">SiReS Bibliotecas UA</h1>
         <p className="text-slate-500 text-sm mb-8 text-center">
           {step === 'request' 
             ? (mode === 'login' ? 'Inicie sessão com o seu e-mail da UA' : 'Crie a sua conta da UA')
@@ -258,6 +290,7 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
                   value={digit}
                   onChange={(e) => handleOtpChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
+                  onPaste={handlePaste}
                   className="w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 border-slate-200 focus:border-[#0066cc] focus:outline-none transition-all"
                 />
               ))}
@@ -1658,7 +1691,7 @@ export default function App() {
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3 text-primary">
             <Building2 className="h-8 w-8" />
-            <h2 className="text-lg font-bold tracking-tight text-slate-900">SIRS - UA</h2>
+            <h2 className="text-lg font-bold tracking-tight text-slate-900">SiReS Bibliotecas UA</h2>
           </div>
           <nav className="hidden md:flex items-center gap-8">
             <button 

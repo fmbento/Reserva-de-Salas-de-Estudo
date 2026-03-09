@@ -176,17 +176,17 @@ async function sendWelcomeEmail(email: string, name: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"SIRS UA" <${process.env.SMTP_USER}>`,
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: "Bem-vindo ao SIRS UA",
+      subject: "Bem-vindo ao SiReS Bibliotecas UA",
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #0066cc; text-align: center;">SIRS - UA</h2>
+          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
           <p>Olá <strong>${name}</strong>,</p>
           <p>A sua conta foi criada com sucesso na plataforma de reserva de salas da Universidade de Aveiro.</p>
           <p>Agora já pode reservar salas de estudo e laboratórios de forma rápida e eficiente.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SIRS</p>
+          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SiReS</p>
         </div>
       `,
     });
@@ -199,12 +199,12 @@ async function sendReservationPendingEmail(email: string, roomName: string, date
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"SIRS UA" <${process.env.SMTP_USER}>`,
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: "Pedido de Reserva Recebido - SIRS UA",
+      subject: "Pedido de Reserva Recebido - SiReS Bibliotecas UA",
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #0066cc; text-align: center;">SIRS - UA</h2>
+          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
           <p>O seu pedido de reserva foi recebido e está <strong>pendente de aprovação</strong>.</p>
           <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 5px 0;"><strong>Sala:</strong> ${roomName}</p>
@@ -213,7 +213,7 @@ async function sendReservationPendingEmail(email: string, roomName: string, date
           </div>
           <p>Receberá uma confirmação assim que o pedido for validado pelos serviços da biblioteca.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SIRS</p>
+          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SiReS</p>
         </div>
       `,
     });
@@ -226,7 +226,7 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
   
   const isConfirmed = status === 'Confirmed' || status === 'Occupied';
-  const subject = isConfirmed ? "Reserva CONFIRMADA - SIRS UA" : "Reserva CANCELADA - SIRS UA";
+  const subject = isConfirmed ? "Reserva CONFIRMADA - SiReS Bibliotecas UA" : "Reserva CANCELADA - SiReS Bibliotecas UA";
   
   let attachments: any[] = [];
   
@@ -237,7 +237,7 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
     const event: ics.EventAttributes = {
       start: [year, month, day, hour, minute],
       duration: { minutes: res.duration },
-      title: `Reserva SIRS UA: ${roomName}`,
+      title: `Reserva SiReS Bibliotecas UA: ${roomName}`,
       description: `Assunto: ${res.subject}`,
       location: roomName,
       status: 'CONFIRMED',
@@ -256,13 +256,13 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
 
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"SIRS UA" <${process.env.SMTP_USER}>`,
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
       to: email,
       subject: subject,
       attachments: attachments,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: ${isConfirmed ? '#10b981' : '#ef4444'}; text-align: center;">SIRS - UA</h2>
+          <h2 style="color: ${isConfirmed ? '#10b981' : '#ef4444'}; text-align: center;">SiReS Bibliotecas UA</h2>
           <p>A sua reserva para a sala <strong>${roomName}</strong> foi <strong>${isConfirmed ? 'CONFIRMADA' : 'CANCELADA'}</strong>.</p>
           <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 5px 0;"><strong>Sala:</strong> ${roomName}</p>
@@ -272,7 +272,7 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
           </div>
           ${isConfirmed ? '<p>Enviamos em anexo o ficheiro para adicionar ao seu calendário.</p>' : '<p>Se tiver alguma dúvida, por favor contacte os serviços da biblioteca.</p>'}
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SIRS</p>
+          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SiReS</p>
         </div>
       `,
     });
@@ -293,12 +293,12 @@ async function sendOtpEmail(email: string, code: string) {
 
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"SIRS UA" <${process.env.SMTP_USER}>`,
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: "Código de Acesso - SIRS UA",
+      subject: "Código de Acesso - SiReS Bibliotecas UA",
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; rounded: 10px;">
-          <h2 style="color: #0066cc; text-align: center;">SIRS - UA</h2>
+          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
           <p>Olá,</p>
           <p>Utilize o seguinte código para aceder à plataforma de reserva de salas:</p>
           <div style="background: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333; margin: 20px 0; border-radius: 8px;">
@@ -306,7 +306,7 @@ async function sendOtpEmail(email: string, code: string) {
           </div>
           <p style="color: #666; font-size: 14px;">Este código expira em 10 minutos. Se não solicitou este código, por favor ignore este e-mail.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SIRS</p>
+          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SiReS</p>
         </div>
       `,
     });
