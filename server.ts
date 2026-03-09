@@ -172,6 +172,28 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+function formatReservationTime(startTime: string, durationMinutes: number) {
+  const [h, m] = startTime.split(':').map(Number);
+  const startTotal = h * 60 + m;
+  const endTotal = startTotal + durationMinutes;
+  
+  const endH = Math.floor(endTotal / 60) % 24;
+  const endM = endTotal % 60;
+  const endTime = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+  
+  let durationStr = '';
+  const dh = Math.floor(durationMinutes / 60);
+  const dm = durationMinutes % 60;
+  
+  if (dh > 0) {
+    durationStr = `${dh}h${dm > 0 ? (dm < 10 ? '0' + dm : dm) : ''}`;
+  } else {
+    durationStr = `${dm}min`;
+  }
+  
+  return `${startTime} - ${endTime} (duração: ${durationStr})`;
+}
+
 async function sendWelcomeEmail(email: string, name: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
   try {
@@ -195,7 +217,7 @@ async function sendWelcomeEmail(email: string, name: string) {
   }
 }
 
-async function sendReservationPendingEmail(email: string, roomName: string, date: string, time: string) {
+async function sendReservationPendingEmail(email: string, roomName: string, date: string, startTime: string, duration: number) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
   try {
     await transporter.sendMail({
@@ -209,7 +231,7 @@ async function sendReservationPendingEmail(email: string, roomName: string, date
           <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 5px 0;"><strong>Sala:</strong> ${roomName}</p>
             <p style="margin: 5px 0;"><strong>Data:</strong> ${date}</p>
-            <p style="margin: 5px 0;"><strong>Hora:</strong> ${time}</p>
+            <p style="margin: 5px 0;"><strong>Hora:</strong> ${formatReservationTime(startTime, duration)}</p>
           </div>
           <p>Receberá uma confirmação assim que o pedido for validado pelos serviços da biblioteca.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
@@ -267,7 +289,7 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
           <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 5px 0;"><strong>Sala:</strong> ${roomName}</p>
             <p style="margin: 5px 0;"><strong>Data:</strong> ${res.date}</p>
-            <p style="margin: 5px 0;"><strong>Hora:</strong> ${res.start_time}</p>
+            <p style="margin: 5px 0;"><strong>Hora:</strong> ${formatReservationTime(res.start_time, res.duration)}</p>
             <p style="margin: 5px 0;"><strong>Estado:</strong> ${isConfirmed ? 'Confirmada' : 'Cancelada'}</p>
           </div>
           ${isConfirmed ? '<p>Enviamos em anexo o ficheiro para adicionar ao seu calendário.</p>' : '<p>Se tiver alguma dúvida, por favor contacte os serviços da biblioteca.</p>'}
@@ -462,7 +484,7 @@ async function startServer() {
       const user = db.prepare("SELECT email FROM users WHERE id = ?").get(uid) as { email: string };
       const room = db.prepare("SELECT name FROM rooms WHERE id = ?").get(room_id) as { name: string };
       if (user && room) {
-        sendReservationPendingEmail(user.email, room.name, date, start_time).catch(console.error);
+        sendReservationPendingEmail(user.email, room.name, date, start_time, duration).catch(console.error);
       }
 
       res.status(201).json(newReservation);
