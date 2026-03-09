@@ -4,7 +4,8 @@ import Database from "better-sqlite3";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import fs from "fs"; // Adicione este import no topo
+import fs from "fs";
+import nodemailer from "nodemailer";
 
 dotenv.config();
 
@@ -20,6 +21,7 @@ let db: any;
 try {
   // Alteração aqui: aponta para a subpasta /data mapeada no Docker
   db = new Database(path.join(dataDir, "salas.db")); 
+  db.pragma('foreign_keys = ON');
   console.log("Database initialized successfully at ./data/salas.db");
 } catch (error) {
   console.error("Failed to initialize database:", error);
@@ -60,6 +62,13 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS otps (
+    email TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    name TEXT,
+    expires_at DATETIME NOT NULL
+  );
+
   -- Ensure rooms table has the new columns
 `);
 
@@ -74,38 +83,43 @@ const seedData = () => {
     { name: "Utilizador Teste 2", email: "teste02@ua.pt", role: "user" },
     { name: "Bibliotecário 01", email: "bib01@ua.pt", role: "librarian" },
     { name: "Administrador do Sistema 01", email: "admin01@ua.pt", role: "admin" },
+    { name: "Filipe Bento", email: "filben@gmail.com", role: "admin" },
   ];
 
   console.log("Seeding users...");
-  const insertUser = db.prepare("INSERT OR REPLACE INTO users (name, email, role) VALUES (?, ?, ?)");
+  const insertUser = db.prepare(`
+    INSERT INTO users (name, email, role) 
+    VALUES (?, ?, ?)
+    ON CONFLICT(email) DO UPDATE SET 
+      name = excluded.name,
+      role = excluded.role
+  `);
   users.forEach(u => {
-    const result = insertUser.run(u.name, u.email, u.role);
-    console.log(`User seed result for ${u.email}: changes=${result.changes}`);
+    insertUser.run(u.name, u.email, u.role);
   });
 
   const allUsersInDb = db.prepare("SELECT * FROM users").all();
   console.log("All users in DB:", allUsersInDb);
-  if (allUsersInDb.length < 4) {
-    console.warn(`Warning: Only ${allUsersInDb.length} users found in DB. Expected at least 4.`);
-  }
-
+  
+  const u1 = db.prepare("SELECT id FROM users WHERE email = ?").get("teste01@ua.pt") as { id: number } | undefined;
   const u2 = db.prepare("SELECT id FROM users WHERE email = ?").get("teste02@ua.pt") as { id: number } | undefined;
-  if (!u2) {
-    console.error("Critical error: Seed user 'teste02@ua.pt' not found after insertion.");
+
+  if (!u1 || !u2) {
+    console.error("Critical error: Seed users not found after insertion.");
     return;
   }
 
   const roomCount = db.prepare("SELECT count(*) as count FROM rooms").get() as { count: number };
   if (roomCount.count === 0) {
     const rooms = [
-      { id: '101', name: 'Sala de Estudo 101', department: 'Departamento de Engenharia', status: 'Available', capacity: 10, description: 'Sala equipada com projetor e quadro branco.' },
-      { id: '102', name: 'Sala de Estudo 102', department: 'Departamento de Engenharia', status: 'Available', capacity: 8, description: 'Sala ideal para trabalhos de grupo.' },
-      { id: '201', name: 'Laboratório 201', department: 'Departamento de Informática', status: 'Occupied', capacity: 20, description: 'Laboratório de computação avançada.' },
-      { id: '202', name: 'Laboratório 202', department: 'Departamento de Informática', status: 'Available', capacity: 15, description: 'Laboratório de redes.' },
-      { id: '301', name: 'Anfiteatro 301', department: 'Departamento de Artes', status: 'Pending', capacity: 50, description: 'Anfiteatro para palestras.' },
+      { id: '101', name: 'Sala de Estudo 101', department: 'Departamento de Engenharia', status: 'Available', capacity: 10, description: 'Sala equipada com projetor e quadro branco.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas', 'Projetor']) },
+      { id: '102', name: 'Sala de Estudo 102', department: 'Departamento de Engenharia', status: 'Available', capacity: 8, description: 'Sala ideal para trabalhos de grupo.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']) },
+      { id: '201', name: 'Laboratório 201', department: 'Departamento de Informática', status: 'Occupied', capacity: 20, description: 'Laboratório de computação avançada.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas', 'Smart Screen']) },
+      { id: '202', name: 'Laboratório 202', department: 'Departamento de Informática', status: 'Available', capacity: 15, description: 'Laboratório de redes.', operational_status: 'Maintenance', amenities: JSON.stringify(['Eduroam', 'Tomadas']) },
+      { id: '301', name: 'Anfiteatro 301', department: 'Departamento de Artes', status: 'Pending', capacity: 50, description: 'Anfiteatro para palestras.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Projetor', 'Ar Condicionado']) },
     ];
-    const insertRoom = db.prepare("INSERT INTO rooms (id, name, department, status, capacity, description) VALUES (?, ?, ?, ?, ?, ?)");
-    rooms.forEach(room => insertRoom.run(room.id, room.name, room.department, room.status, room.capacity, room.description));
+    const insertRoom = db.prepare("INSERT INTO rooms (id, name, department, status, capacity, description, operational_status, amenities) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    rooms.forEach(room => insertRoom.run(room.id, room.name, room.department, room.status, room.capacity, room.description, room.operational_status, room.amenities));
   }
 
   const reservationCount = db.prepare("SELECT count(*) as count FROM reservations").get() as { count: number };
@@ -121,8 +135,8 @@ const seedData = () => {
     // Initial data if count was 0
     if (reservationCount.count === 0) {
       const initialReservations = [
-        { room_id: '101', user_id: 1, date: '2026-03-05', start_time: '10:00', duration: 120, subject: 'Group Study', status: 'Occupied' },
-        { room_id: '102', user_id: 1, date: '2026-03-06', start_time: '12:00', duration: 60, subject: 'Tese Review', status: 'Pending' },
+        { room_id: '101', user_id: u1.id, date: '2026-03-05', start_time: '10:00', duration: 120, subject: 'Group Study', status: 'Occupied' },
+        { room_id: '102', user_id: u1.id, date: '2026-03-06', start_time: '12:00', duration: 60, subject: 'Tese Review', status: 'Pending' },
       ];
       initialReservations.forEach(res => insertReservation.run(res.room_id, res.user_id, res.date, res.start_time, res.duration, res.subject, res.status));
     }
@@ -138,6 +152,50 @@ try {
   console.error("Error seeding database:", error);
 }
 
+// Nodemailer Transporter
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: process.env.SMTP_PORT === '465',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+async function sendOtpEmail(email: string, code: string) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn("[AUTH] SMTP credentials missing. OTP logged to console only.");
+    console.log(`[AUTH] OTP for ${email}: ${code}`);
+    return;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SIRS UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Código de Acesso - SIRS UA",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; rounded: 10px;">
+          <h2 style="color: #0066cc; text-align: center;">SIRS - UA</h2>
+          <p>Olá,</p>
+          <p>Utilize o seguinte código para aceder à plataforma de reserva de salas:</p>
+          <div style="background: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333; margin: 20px 0; border-radius: 8px;">
+            ${code}
+          </div>
+          <p style="color: #666; font-size: 14px;">Este código expira em 10 minutos. Se não solicitou este código, por favor ignore este e-mail.</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SIRS</p>
+        </div>
+      `,
+    });
+    console.log(`[AUTH] OTP email sent to ${email}`);
+  } catch (error) {
+    console.error(`[AUTH] Failed to send OTP email to ${email}:`, error);
+    throw error;
+  }
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json());
@@ -145,6 +203,71 @@ async function startServer() {
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  // Auth Endpoints
+  app.post("/api/auth/request-otp", async (req, res) => {
+    const { email, name, type } = req.body; // type: 'login' | 'register'
+    
+    if (!email.endsWith("@ua.pt") && email !== "filben@gmail.com") {
+      return res.status(400).json({ error: "Apenas e-mails oficiais da Universidade de Aveiro (@ua.pt) são permitidos." });
+    }
+
+    // Check if user exists for login
+    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    if (type === 'login' && !user) {
+      return res.status(404).json({ error: "Conta não encontrada. Por favor, registe-se primeiro." });
+    }
+    if (type === 'register' && user) {
+      return res.status(400).json({ error: "Este e-mail já está registado. Por favor, faça login." });
+    }
+
+    const code = Math.floor(10000 + Math.random() * 90000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
+
+    try {
+      db.prepare(`
+        INSERT OR REPLACE INTO otps (email, code, name, expires_at)
+        VALUES (?, ?, ?, ?)
+      `).run(email, code, name || null, expiresAt);
+
+      await sendOtpEmail(email, code);
+      res.json({ success: true, message: "Código enviado para o seu e-mail." });
+    } catch (error) {
+      console.error("Error saving OTP or sending email:", error);
+      res.status(500).json({ error: "Erro ao processar o pedido de acesso." });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", (req, res) => {
+    const { email, code } = req.body;
+
+    const otpRecord = db.prepare("SELECT * FROM otps WHERE email = ?").get(email);
+
+    if (!otpRecord) {
+      return res.status(400).json({ error: "Código inválido ou expirado." });
+    }
+
+    if (otpRecord.code !== code) {
+      return res.status(400).json({ error: "Código incorreto." });
+    }
+
+    if (new Date(otpRecord.expires_at) < new Date()) {
+      return res.status(400).json({ error: "Código expirado." });
+    }
+
+    // Valid OTP - Find or Create User
+    let user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+
+    if (!user) {
+      const result = db.prepare("INSERT INTO users (name, email, role) VALUES (?, ?, 'user')").run(otpRecord.name || "Utilizador UA", email);
+      user = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
+    }
+
+    // Clean up OTP
+    db.prepare("DELETE FROM otps WHERE email = ?").run(email);
+
+    res.json(user);
   });
 
   // API Routes

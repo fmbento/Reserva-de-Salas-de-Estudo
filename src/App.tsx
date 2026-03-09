@@ -34,7 +34,8 @@ import {
   MoreVertical,
   Check,
   RotateCcw,
-  Upload
+  Upload,
+  ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -80,6 +81,217 @@ interface UserData {
   email: string;
   role: 'user' | 'librarian' | 'admin';
 }
+
+const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void }) => {
+  const [step, setStep] = useState<'request' | 'verify'>('request');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [otp, setOtp] = useState(['', '', '', '', '']);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleRequestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.endsWith('@ua.pt') && email !== 'filben@gmail.com') {
+      setError('Apenas e-mails oficiais da Universidade de Aveiro (@ua.pt) são permitidos.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/request-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name: mode === 'register' ? name : undefined, type: mode }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStep('verify');
+      } else {
+        setError(data.error || 'Erro ao solicitar código.');
+      }
+    } catch (err) {
+      setError('Erro de conexão.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const code = otp.join('');
+    if (code.length < 5) {
+      setError('Por favor, insira o código de 5 dígitos.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onLoginSuccess(data);
+      } else {
+        setError(data.error || 'Código incorreto.');
+      }
+    } catch (err) {
+      setError('Erro de conexão.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) value = value[value.length - 1];
+    if (value && !/^\d$/.test(value)) return;
+
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    if (value && index < 4) {
+      const nextInput = document.getElementById(`otp-${index + 1}`);
+      nextInput?.focus();
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      prevInput?.focus();
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 flex flex-col items-center"
+      >
+        <div className="w-16 h-16 bg-[#0066cc] rounded-full flex items-center justify-center text-white font-bold text-2xl mb-6">
+          UA
+        </div>
+        
+        <h1 className="text-2xl font-bold text-slate-900 mb-1">SIRS - UA</h1>
+        <p className="text-slate-500 text-sm mb-8 text-center">
+          {step === 'request' 
+            ? (mode === 'login' ? 'Inicie sessão com o seu e-mail da UA' : 'Crie a sua conta da UA')
+            : 'Verifique o seu e-mail. Introduza o código de 5 dígitos enviado para o seu e-mail da UA.'}
+        </p>
+
+        {error && (
+          <div className="w-full mb-6 p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm flex items-center gap-2">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
+        {step === 'request' ? (
+          <form onSubmit={handleRequestOtp} className="w-full space-y-6">
+            {mode === 'register' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Nome Completo</label>
+                <input 
+                  type="text" 
+                  placeholder="Seu nome aqui"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0066cc] focus:border-transparent transition-all"
+                />
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">E-mail da UA</label>
+              <input 
+                type="email" 
+                placeholder="utilizador@ua.pt"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0066cc] focus:border-transparent transition-all"
+              />
+              <p className="text-xs text-slate-400">Apenas e-mails oficiais da Universidade de Aveiro.</p>
+            </div>
+
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+            >
+              {loading ? <Loader2 className="animate-spin" size={20} /> : 'Receber Código por E-mail'}
+            </button>
+
+            <div className="text-center">
+              <button 
+                type="button"
+                onClick={() => {
+                  setMode(mode === 'login' ? 'register' : 'login');
+                  setError('');
+                }}
+                className="text-sm text-[#0066cc] font-bold hover:underline"
+              >
+                {mode === 'login' ? 'Ainda não tem conta? Registe-se' : 'Já tem conta? Inicie sessão'}
+              </button>
+            </div>
+            
+            <div className="pt-4 border-t border-slate-100 text-center">
+              <p className="text-xs font-bold text-slate-300 tracking-widest uppercase">Restrito a domínios @ua.pt</p>
+            </div>
+          </form>
+        ) : (
+          <div className="w-full space-y-8">
+            <div className="flex justify-between gap-2">
+              {otp.map((digit, idx) => (
+                <input
+                  key={idx}
+                  id={`otp-${idx}`}
+                  type="text"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleOtpChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(idx, e)}
+                  className="w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 border-slate-200 focus:border-[#0066cc] focus:outline-none transition-all"
+                />
+              ))}
+            </div>
+
+            <button 
+              onClick={() => handleVerifyOtp()}
+              disabled={loading || otp.join('').length < 5}
+              className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+            >
+              {loading ? <Loader2 className="animate-spin" size={20} /> : (
+                <>
+                  Entrar <ArrowRight size={20} />
+                </>
+              )}
+            </button>
+
+            <div className="text-center">
+              <p className="text-sm text-slate-500">
+                Não recebeu o código? <button onClick={handleRequestOtp} className="text-[#0066cc] font-bold hover:underline">Reenviar</button>
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 text-center">
+              <p className="text-xs font-bold text-slate-300 tracking-widest uppercase">Universidade de Aveiro</p>
+            </div>
+          </div>
+        )}
+      </motion.div>
+      
+      <p className="mt-8 text-slate-500 text-sm">Precisa de ajuda com o acesso?</p>
+    </div>
+  );
+};
 
 const BackofficeView = ({ 
   reservations, 
@@ -989,6 +1201,7 @@ const SchedulesView = ({
 };
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice' | 'manage-rooms'>('map');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('101');
@@ -1020,23 +1233,44 @@ export default function App() {
   }>({ isOpen: false, type: 'room', originalDuration: 0, newDuration: 0 });
 
   useEffect(() => {
+    const savedUser = localStorage.getItem('sirs_user');
+    if (savedUser) {
+      const user = JSON.parse(savedUser);
+      setCurrentUser(user);
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  const handleLoginSuccess = (user: UserData) => {
+    localStorage.setItem('sirs_user', JSON.stringify(user));
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('sirs_user');
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+  };
+
+  useEffect(() => {
     console.log("Current allUsers state:", allUsers);
   }, [allUsers]);
 
   // Fetch initial data
   useEffect(() => {
+    if (!isLoggedIn) return;
+
     const fetchData = async () => {
       try {
-        const [roomsRes, reservationsRes, userRes, allUsersRes] = await Promise.all([
+        const [roomsRes, reservationsRes, allUsersRes] = await Promise.all([
           fetch('/api/rooms'),
           fetch('/api/reservations'),
-          fetch('/api/user/me'),
           fetch('/api/users')
         ]);
 
         const roomsData = await roomsRes.json();
         const reservationsData = await reservationsRes.json();
-        const userData = await userRes.json();
         const allUsersData = await allUsersRes.json();
         console.log("Fetched all users:", allUsersData);
         setAllUsers(allUsersData);
@@ -1066,14 +1300,13 @@ export default function App() {
 
         setRooms(mappedRooms);
         setReservations(mappedReservations);
-        setCurrentUser(userData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
       }
     };
 
     fetchData();
-  }, []);
+  }, [isLoggedIn]);
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId) || rooms[0];
 
@@ -1414,6 +1647,10 @@ export default function App() {
     }
   };
 
+  if (!isLoggedIn) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="flex h-screen w-full flex-col bg-background-light overflow-hidden">
       {/* Header */}
@@ -1532,9 +1769,23 @@ export default function App() {
                     className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-[100]"
                   >
                     <div className="px-4 py-2 border-b border-slate-100 mb-1">
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Alterar Utilizador</p>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Conta</p>
                     </div>
-                    {allUsers.map(u => (
+                    <div className="px-4 py-3 mb-2 bg-slate-50 border-b border-slate-100">
+                      <p className="text-sm font-bold text-slate-900">{currentUser?.name}</p>
+                      <p className="text-xs text-slate-500">{currentUser?.email}</p>
+                      <span className="inline-block mt-1.5 px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold uppercase">
+                        {currentUser?.role}
+                      </span>
+                    </div>
+
+                    {currentUser?.role === 'admin' && (
+                      <div className="px-4 py-2 border-b border-slate-100 mb-1">
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Simular Utilizador</p>
+                      </div>
+                    )}
+                    
+                    {currentUser?.role === 'admin' && allUsers.map(u => (
                       <button
                         key={u.id}
                         onClick={() => handleSwitchUser(u.email)}
@@ -1544,11 +1795,18 @@ export default function App() {
                           {u.name}
                         </span>
                         <span className="text-xs text-slate-400">{u.email}</span>
-                        <span className="text-[10px] mt-0.5 px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md self-start uppercase font-bold">
-                          {u.role}
-                        </span>
                       </button>
                     ))}
+
+                    <div className="mt-1 pt-1 border-t border-slate-100">
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-3 hover:bg-rose-50 text-rose-600 transition-colors flex items-center gap-2 text-sm font-bold"
+                      >
+                        <RotateCcw size={16} />
+                        Terminar Sessão
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
