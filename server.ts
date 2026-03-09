@@ -7,10 +7,17 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import nodemailer from "nodemailer";
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load environment variables from .env file
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+  console.log(`[AUTH] .env file loaded from ${envPath}`);
+} else {
+  console.warn(`[AUTH] .env file not found at ${envPath}`);
+}
 
 const dataDir = path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) {
@@ -78,11 +85,12 @@ try { db.exec("ALTER TABLE rooms ADD COLUMN amenities TEXT DEFAULT '[]'"); } cat
 
 // Seed initial data
 const seedData = () => {
+  const adminEmail = process.env.ADMIN_EMAIL || "sbidm-biblioteca@ua.pt";
   const users = [
     { name: "Utilizador Teste 1", email: "teste01@ua.pt", role: "user" },
     { name: "Utilizador Teste 2", email: "teste02@ua.pt", role: "user" },
     { name: "Bibliotecário 01", email: "bib01@ua.pt", role: "librarian" },
-    { name: "Administrador do Sistema 01", email: "sbidm-biblioteca@ua.pt", role: "admin" },
+    { name: "Administrador do Sistema 01", email: adminEmail, role: "admin" },
     { name: "Filipe Bento", email: "filben@gmail.com", role: "admin" },
   ];
 
@@ -165,7 +173,10 @@ const transporter = nodemailer.createTransport({
 
 async function sendOtpEmail(email: string, code: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.warn("[AUTH] SMTP credentials missing. OTP logged to console only.");
+    const missing = [];
+    if (!process.env.SMTP_USER) missing.push('SMTP_USER');
+    if (!process.env.SMTP_PASS) missing.push('SMTP_PASS');
+    console.warn(`[AUTH] SMTP credentials missing (${missing.join(', ')}). OTP logged to console only.`);
     console.log(`[AUTH] OTP for ${email}: ${code}`);
     return;
   }
@@ -209,7 +220,8 @@ async function startServer() {
   app.post("/api/auth/request-otp", async (req, res) => {
     const { email, name, type } = req.body; // type: 'login' | 'register'
     
-    if (!email.endsWith("@ua.pt") && email !== "filben@gmail.com") {
+    const adminEmail = process.env.ADMIN_EMAIL || "sbidm-biblioteca@ua.pt";
+    if (!email.endsWith("@ua.pt") && email !== "filben@gmail.com" && email !== adminEmail) {
       return res.status(400).json({ error: "Apenas e-mails oficiais da Universidade de Aveiro (@ua.pt) são permitidos." });
     }
 
