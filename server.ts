@@ -374,7 +374,10 @@ async function startServer() {
 
   app.put("/api/rooms/:id", (req, res) => {
     const { id } = req.params;
-    const { name, department, capacity, operational_status, image, amenities } = req.body;
+    const { name, department, capacity, operationalStatus, operational_status, image, amenities } = req.body;
+    
+    // Handle both camelCase and snake_case from frontend
+    const opStatus = operationalStatus || operational_status;
     
     try {
       const stmt = db.prepare(`
@@ -382,7 +385,7 @@ async function startServer() {
         SET name = ?, department = ?, capacity = ?, operational_status = ?, image = ?, amenities = ?
         WHERE id = ?
       `);
-      const result = stmt.run(name, department, capacity, operational_status, image, JSON.stringify(amenities), id);
+      const result = stmt.run(name, department, capacity, opStatus, image, JSON.stringify(amenities), id);
       
       if (result.changes > 0) {
         res.json({ success: true });
