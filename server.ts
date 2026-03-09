@@ -82,7 +82,7 @@ const seedData = () => {
     { name: "Utilizador Teste 1", email: "teste01@ua.pt", role: "user" },
     { name: "Utilizador Teste 2", email: "teste02@ua.pt", role: "user" },
     { name: "Bibliotecário 01", email: "bib01@ua.pt", role: "librarian" },
-    { name: "Administrador do Sistema 01", email: "admin01@ua.pt", role: "admin" },
+    { name: "Administrador do Sistema 01", email: "sbidm-biblioteca@ua.pt", role: "admin" },
     { name: "Filipe Bento", email: "filben@gmail.com", role: "admin" },
   ];
 
