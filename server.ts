@@ -6,6 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 import nodemailer from "nodemailer";
+import * as ics from 'ics';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -171,6 +172,115 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+async function sendWelcomeEmail(email: string, name: string) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SIRS UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Bem-vindo ao SIRS UA",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #0066cc; text-align: center;">SIRS - UA</h2>
+          <p>Olá <strong>${name}</strong>,</p>
+          <p>A sua conta foi criada com sucesso na plataforma de reserva de salas da Universidade de Aveiro.</p>
+          <p>Agora já pode reservar salas de estudo e laboratórios de forma rápida e eficiente.</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SIRS</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send welcome email to ${email}:`, error);
+  }
+}
+
+async function sendReservationPendingEmail(email: string, roomName: string, date: string, time: string) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SIRS UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Pedido de Reserva Recebido - SIRS UA",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #0066cc; text-align: center;">SIRS - UA</h2>
+          <p>O seu pedido de reserva foi recebido e está <strong>pendente de aprovação</strong>.</p>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Sala:</strong> ${roomName}</p>
+            <p style="margin: 5px 0;"><strong>Data:</strong> ${date}</p>
+            <p style="margin: 5px 0;"><strong>Hora:</strong> ${time}</p>
+          </div>
+          <p>Receberá uma confirmação assim que o pedido for validado pelos serviços da biblioteca.</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SIRS</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send pending email to ${email}:`, error);
+  }
+}
+
+async function sendReservationStatusEmail(email: string, roomName: string, res: any, status: string) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  
+  const isConfirmed = status === 'Confirmed' || status === 'Occupied';
+  const subject = isConfirmed ? "Reserva CONFIRMADA - SIRS UA" : "Reserva CANCELADA - SIRS UA";
+  
+  let attachments: any[] = [];
+  
+  if (isConfirmed) {
+    const [year, month, day] = res.date.split('-').map(Number);
+    const [hour, minute] = res.start_time.split(':').map(Number);
+    
+    const event: ics.EventAttributes = {
+      start: [year, month, day, hour, minute],
+      duration: { minutes: res.duration },
+      title: `Reserva SIRS UA: ${roomName}`,
+      description: `Assunto: ${res.subject}`,
+      location: roomName,
+      status: 'CONFIRMED',
+      busyStatus: 'BUSY',
+    };
+
+    const { error, value } = ics.createEvent(event);
+    if (!error && value) {
+      attachments.push({
+        filename: 'reserva.ics',
+        content: value,
+        contentType: 'text/calendar'
+      });
+    }
+  }
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SIRS UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: subject,
+      attachments: attachments,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: ${isConfirmed ? '#10b981' : '#ef4444'}; text-align: center;">SIRS - UA</h2>
+          <p>A sua reserva para a sala <strong>${roomName}</strong> foi <strong>${isConfirmed ? 'CONFIRMADA' : 'CANCELADA'}</strong>.</p>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>Sala:</strong> ${roomName}</p>
+            <p style="margin: 5px 0;"><strong>Data:</strong> ${res.date}</p>
+            <p style="margin: 5px 0;"><strong>Hora:</strong> ${res.start_time}</p>
+            <p style="margin: 5px 0;"><strong>Estado:</strong> ${isConfirmed ? 'Confirmada' : 'Cancelada'}</p>
+          </div>
+          ${isConfirmed ? '<p>Enviamos em anexo o ficheiro para adicionar ao seu calendário.</p>' : '<p>Se tiver alguma dúvida, por favor contacte os serviços da biblioteca.</p>'}
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SIRS</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send status email to ${email}:`, error);
+  }
+}
+
 async function sendOtpEmail(email: string, code: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     const missing = [];
@@ -270,14 +380,20 @@ async function startServer() {
 
     // Valid OTP - Find or Create User
     let user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    let isNewUser = false;
 
     if (!user) {
       const result = db.prepare("INSERT INTO users (name, email, role) VALUES (?, ?, 'user')").run(otpRecord.name || "Utilizador UA", email);
       user = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
+      isNewUser = true;
     }
 
     // Clean up OTP
     db.prepare("DELETE FROM otps WHERE email = ?").run(email);
+
+    if (isNewUser && user) {
+      sendWelcomeEmail(user.email, user.name).catch(console.error);
+    }
 
     res.json(user);
   });
@@ -341,6 +457,14 @@ async function startServer() {
       `).run(room_id, uid, date, start_time, duration, subject);
       
       const newReservation = db.prepare("SELECT * FROM reservations WHERE id = ?").get(result.lastInsertRowid);
+      
+      // Send notification
+      const user = db.prepare("SELECT email FROM users WHERE id = ?").get(uid) as { email: string };
+      const room = db.prepare("SELECT name FROM rooms WHERE id = ?").get(room_id) as { name: string };
+      if (user && room) {
+        sendReservationPendingEmail(user.email, room.name, date, start_time).catch(console.error);
+      }
+
       res.status(201).json(newReservation);
     } catch (error) {
       res.status(500).json({ error: "Failed to create reservation" });
@@ -350,6 +474,19 @@ async function startServer() {
   app.delete("/api/reservations/:id", (req, res) => {
     const { id } = req.params;
     try {
+      // Fetch details before deleting for notification
+      const reservation = db.prepare(`
+        SELECT r.*, rm.name as room_name, u.email as user_email 
+        FROM reservations r 
+        JOIN rooms rm ON r.room_id = rm.id 
+        JOIN users u ON r.user_id = u.id
+        WHERE r.id = ?
+      `).get(id);
+
+      if (reservation) {
+        sendReservationStatusEmail(reservation.user_email, reservation.room_name, reservation, 'Cancelled').catch(console.error);
+      }
+
       db.prepare("DELETE FROM reservations WHERE id = ?").run(id);
       res.status(204).send();
     } catch (error) {
@@ -403,6 +540,20 @@ async function startServer() {
     const { status } = req.body;
     try {
       db.prepare("UPDATE reservations SET status = ? WHERE id = ?").run(status, id);
+      
+      // Send notification
+      const reservation = db.prepare(`
+        SELECT r.*, rm.name as room_name, u.email as user_email 
+        FROM reservations r 
+        JOIN rooms rm ON r.room_id = rm.id 
+        JOIN users u ON r.user_id = u.id
+        WHERE r.id = ?
+      `).get(id);
+
+      if (reservation) {
+        sendReservationStatusEmail(reservation.user_email, reservation.room_name, reservation, status).catch(console.error);
+      }
+
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to update status" });
