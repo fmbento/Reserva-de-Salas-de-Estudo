@@ -1135,100 +1135,96 @@ const SchedulesView = ({
 
         {/* Timeline Grid */}
         <div className="flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-x-auto">
-            <div className="min-w-[800px] md:min-w-0 flex flex-col h-full">
-              {/* Grid Header */}
-              <div className="grid grid-cols-8 border-b border-slate-100 bg-slate-50/50">
-                <div className="p-4 border-r border-slate-100" />
-                {days.map((day, i) => (
-                  <div key={day} className={`p-4 text-center border-r border-slate-100 last:border-r-0 ${i === 1 ? 'bg-primary/5' : ''}`}>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{day}</span>
-                    <span className={`text-lg font-bold ${i === 1 ? 'text-primary' : 'text-slate-900'}`}>
-                      {(() => {
-                        const d = new Date(currentDate);
-                        d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1) + i);
-                        return d.getDate();
-                      })()}
-                    </span>
+          {/* Grid Header */}
+          <div className="grid grid-cols-8 border-b border-slate-100 bg-slate-50/50">
+            <div className="p-4 border-r border-slate-100" />
+            {days.map((day, i) => (
+              <div key={day} className={`p-4 text-center border-r border-slate-100 last:border-r-0 ${i === 1 ? 'bg-primary/5' : ''}`}>
+                <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{day}</span>
+                <span className={`text-lg font-bold ${i === 1 ? 'text-primary' : 'text-slate-900'}`}>
+                  {(() => {
+                    const d = new Date(currentDate);
+                    d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1) + i);
+                    return d.getDate();
+                  })()}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Grid Body */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-8 min-h-full">
+              {/* Time Column */}
+              <div className="flex flex-col">
+                {hours.map(hour => (
+                  <div key={hour} className="h-20 p-4 text-right border-r border-b border-slate-100 text-[10px] font-bold text-slate-400">
+                    {hour}
                   </div>
                 ))}
               </div>
 
-              {/* Grid Body */}
-              <div className="flex-1 overflow-y-auto">
-                <div className="grid grid-cols-8 min-h-full">
-                  {/* Time Column */}
-                  <div className="flex flex-col">
-                    {hours.map(hour => (
-                      <div key={hour} className="h-20 p-4 text-right border-r border-b border-slate-100 text-[10px] font-bold text-slate-400">
-                        {hour}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Day Columns */}
-                  {days.map((_, dayIndex) => (
-                    <div 
-                      key={dayIndex} 
-                      className="relative flex flex-col border-r border-slate-100 last:border-r-0 select-none"
-                      onMouseLeave={() => isDragging && handleMouseUp()}
-                    >
-                      {hours.map(hour => (
-                        <div key={hour} className="h-20 border-b border-slate-100 flex flex-col">
-                          {[0, 15, 30, 45].map(minute => (
-                            <button
-                              key={minute}
-                              onMouseDown={() => handleMouseDown(dayIndex, hour, minute)}
-                              onMouseEnter={() => handleMouseEnter(dayIndex, hour, minute)}
-                              onMouseUp={handleMouseUp}
-                              disabled={isSlotOccupied(dayIndex, hour, minute) || isSlotInPast(dayIndex, hour, minute)}
-                              className={`flex-1 transition-colors border-b border-slate-50 last:border-0 group relative ${
-                                isSlotSelected(dayIndex, hour, minute) ? 'bg-primary/20' : 
-                                isSlotOccupied(dayIndex, hour, minute) ? 'cursor-not-allowed' : 
-                                isSlotInPast(dayIndex, hour, minute) ? 'bg-slate-50 cursor-not-allowed' : 'hover:bg-primary/5'
-                              }`}
-                            >
-                              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none z-20">
-                                <span className="text-[10px] font-bold text-primary bg-white px-2 py-1 rounded-lg shadow-xl border border-primary/20 whitespace-nowrap">
-                                  {isSlotSelected(dayIndex, hour, minute) && getSelectionInterval() 
-                                    ? getSelectionInterval() 
-                                    : `${hour.split(':')[0]}:${minute.toString().padStart(2, '0')}`}
-                                </span>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
+              {/* Day Columns */}
+              {days.map((_, dayIndex) => (
+                <div 
+                  key={dayIndex} 
+                  className="relative flex flex-col border-r border-slate-100 last:border-r-0 select-none"
+                  onMouseLeave={() => isDragging && handleMouseUp()}
+                >
+                  {hours.map(hour => (
+                    <div key={hour} className="h-20 border-b border-slate-100 flex flex-col">
+                      {[0, 15, 30, 45].map(minute => (
+                        <button
+                          key={minute}
+                          onMouseDown={() => handleMouseDown(dayIndex, hour, minute)}
+                          onMouseEnter={() => handleMouseEnter(dayIndex, hour, minute)}
+                          onMouseUp={handleMouseUp}
+                          disabled={isSlotOccupied(dayIndex, hour, minute) || isSlotInPast(dayIndex, hour, minute)}
+                          className={`flex-1 transition-colors border-b border-slate-50 last:border-0 group relative ${
+                            isSlotSelected(dayIndex, hour, minute) ? 'bg-primary/20' : 
+                            isSlotOccupied(dayIndex, hour, minute) ? 'cursor-not-allowed' : 
+                            isSlotInPast(dayIndex, hour, minute) ? 'bg-slate-50 cursor-not-allowed' : 'hover:bg-primary/5'
+                          }`}
+                        >
+                          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none z-20">
+                            <span className="text-[10px] font-bold text-primary bg-white px-2 py-1 rounded-lg shadow-xl border border-primary/20 whitespace-nowrap">
+                              {isSlotSelected(dayIndex, hour, minute) && getSelectionInterval() 
+                                ? getSelectionInterval() 
+                                : `${hour.split(':')[0]}:${minute.toString().padStart(2, '0')}`}
+                            </span>
+                          </div>
+                        </button>
                       ))}
-                      
-                      {/* Render Schedule Blocks */}
-                      {scheduleData.filter(item => item.day === dayIndex).map((item, idx) => {
-                        const top = (item.startTotal - 8 * 60) * (80 / 60);
-                        const height = item.duration * (80 / 60);
-                        
-                        return (
-                          <motion.div
-                            key={idx}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className={`absolute left-1 right-1 rounded-xl p-3 border-l-4 shadow-sm z-10 ${
-                              item.status === 'Occupied' 
-                                ? 'bg-rose-50 border-rose-500 text-rose-900' 
-                                : 'bg-amber-50 border-amber-500 text-amber-900'
-                            }`}
-                            style={{ top: `${top + 4}px`, height: `${height - 8}px` }}
-                          >
-                            <div className="flex flex-col h-full">
-                              <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{item.status === 'Occupied' ? 'OCUPADO' : 'PENDENTE'}</span>
-                              <span className="text-xs font-bold truncate mt-1">{item.title}</span>
-                              <span className="text-[10px] mt-auto opacity-70">{item.start} - {Math.floor((item.startTotal + item.duration) / 60)}:{(item.startTotal + item.duration) % 60 === 0 ? '00' : (item.startTotal + item.duration) % 60}</span>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
                     </div>
                   ))}
+                  
+                  {/* Render Schedule Blocks */}
+                  {scheduleData.filter(item => item.day === dayIndex).map((item, idx) => {
+                    const top = (item.startTotal - 8 * 60) * (80 / 60);
+                    const height = item.duration * (80 / 60);
+                    
+                    return (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className={`absolute left-1 right-1 rounded-xl p-3 border-l-4 shadow-sm z-10 ${
+                          item.status === 'Occupied' 
+                            ? 'bg-rose-50 border-rose-500 text-rose-900' 
+                            : 'bg-amber-50 border-amber-500 text-amber-900'
+                        }`}
+                        style={{ top: `${top + 4}px`, height: `${height - 8}px` }}
+                      >
+                        <div className="flex flex-col h-full">
+                          <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{item.status === 'Occupied' ? 'OCUPADO' : 'PENDENTE'}</span>
+                          <span className="text-xs font-bold truncate mt-1">{item.title}</span>
+                          <span className="text-[10px] mt-auto opacity-70">{item.start} - {Math.floor((item.startTotal + item.duration) / 60)}:{(item.startTotal + item.duration) % 60 === 0 ? '00' : (item.startTotal + item.duration) % 60}</span>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1241,7 +1237,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice' | 'manage-rooms'>('map');
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [selectedRoomId, setSelectedRoomId] = useState<string>('');
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('101');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
@@ -1252,7 +1248,6 @@ export default function App() {
   
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
   const [bookingMessage, setBookingMessage] = useState<string>('');
-  const [showMobileDetails, setShowMobileDetails] = useState(false);
   
   const [bookingDate, setBookingDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [bookingStartTime, setBookingStartTime] = useState<string>('09:00');
@@ -1294,11 +1289,6 @@ export default function App() {
   useEffect(() => {
     console.log("Current allUsers state:", allUsers);
   }, [allUsers]);
-
-  // Close mobile details when view changes
-  useEffect(() => {
-    setShowMobileDetails(false);
-  }, [currentView]);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -1720,8 +1710,8 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-full flex-col bg-background-light overflow-hidden">
-      {/* Desktop Header - Hidden on Mobile */}
-      <header className="hidden md:flex h-16 border-b border-slate-200 bg-white px-6 md:px-10 items-center justify-between shrink-0 z-50">
+      {/* Header */}
+      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 md:px-10 shrink-0 z-50">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-3 text-primary">
             <Building2 className="h-8 w-8" />
@@ -1882,28 +1872,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Mobile Header - Visible only on Mobile */}
-      <header className="md:hidden h-16 border-b border-slate-200 bg-white px-5 flex items-center justify-between shrink-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 bg-primary rounded-lg flex items-center justify-center text-white shadow-md shadow-primary/20">
-            <Building2 size={20} />
-          </div>
-          <h1 className="text-lg font-bold text-primary tracking-tight">SIRS - UA</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="relative p-2 text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
-            <Bell size={22} />
-            <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 bg-rose-500 border-2 border-white rounded-full"></span>
-          </button>
-          <button 
-            onClick={() => setShowUserSwitcher(!showUserSwitcher)}
-            className="h-9 w-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 border border-slate-200"
-          >
-            <User size={20} />
-          </button>
-        </div>
-      </header>
-
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className="hidden md:flex w-64 flex-col justify-between border-r border-slate-200 bg-white p-4 shrink-0">
@@ -1960,41 +1928,18 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="relative flex-1 overflow-hidden flex flex-col"
+                className="relative flex-1 overflow-hidden"
               >
-                {/* Mobile Search & Filters */}
-                <div className="md:hidden p-4 space-y-4 bg-white/50 backdrop-blur-sm border-b border-slate-200">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
-                      type="text" 
-                      placeholder="Find rooms or buildings"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-12 py-3 bg-white border border-slate-200 rounded-2xl text-sm shadow-sm focus:border-primary focus:ring-primary transition-all"
-                    />
-                    <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-primary bg-primary/5 rounded-lg">
-                      <Filter size={18} />
-                    </button>
-                  </div>
-                  
-                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    <LegendItem color="bg-emerald-500" label="AVAILABLE" />
-                    <LegendItem color="bg-amber-500" label="PENDING" />
-                    <LegendItem color="bg-rose-500" label="OCCUPIED" />
-                  </div>
-                </div>
-
-                {/* Legend - Desktop Only */}
-                <div className="hidden md:flex absolute top-4 left-4 z-10 gap-2 rounded-xl border border-white bg-white/90 p-1 shadow-lg backdrop-blur">
+                {/* Legend */}
+                <div className="absolute top-4 left-4 z-10 flex gap-2 rounded-xl border border-white bg-white/90 p-1 shadow-lg backdrop-blur">
                   <LegendItem color="bg-emerald-500" label="Disponível" />
                   <LegendItem color="bg-amber-500" label="Pendente" />
                   <LegendItem color="bg-rose-500" label="Ocupada" />
                 </div>
 
                 {/* Map Container */}
-                <div className="relative flex-1 flex items-center justify-center p-2 md:p-12 overflow-hidden">
-                  <div className="relative aspect-[4/3] md:aspect-[16/9] w-full max-w-5xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center p-8 md:p-12">
+                  <div className="relative aspect-[16/9] w-full max-w-5xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
                     {/* Mock Floor Plan Background */}
                     <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px]" />
                     <img 
@@ -2014,10 +1959,7 @@ export default function App() {
                           key={room.id} 
                           room={room} 
                           isSelected={selectedRoomId === room.id}
-                          onClick={() => {
-                            setSelectedRoomId(room.id);
-                            setShowMobileDetails(true);
-                          }}
+                          onClick={() => setSelectedRoomId(room.id)}
                           statusColor={statusColor}
                           status={dynamicStatus}
                         />
@@ -2026,8 +1968,8 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Map Controls - Desktop Only */}
-                <div className="hidden md:flex absolute bottom-6 right-6 flex-col gap-2">
+                {/* Map Controls */}
+                <div className="absolute bottom-6 right-6 flex flex-col gap-2">
                   <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-lg hover:bg-slate-50">
                     <Plus size={20} />
                   </button>
@@ -2164,9 +2106,9 @@ export default function App() {
           </AnimatePresence>
         </main>
 
-        {/* Desktop Room Details Sidebar */}
+        {/* Room Details Sidebar (Only visible on Map and Schedules view) */}
         {(currentView === 'map' || currentView === 'schedules') && selectedRoom && (
-          <aside className="hidden md:flex w-80 flex-col border-l border-slate-200 bg-white overflow-y-auto shrink-0">
+          <aside className="w-full md:w-80 flex flex-col border-l border-slate-200 bg-white overflow-y-auto shrink-0">
             <AnimatePresence mode="wait">
               <motion.div 
                 key={selectedRoom.id}
@@ -2283,6 +2225,7 @@ export default function App() {
                               <option value="2 Horas e 45">2 Horas e 45</option>
                               <option value="3 Horas">3 Horas</option>
                               <option value="4 Horas">4 Horas</option>
+                              {/* Fallback for custom drag durations */}
                               {!["15 Minutos", "30 Minutos", "45 Minutos", "1 Hora", "1 Hora e 15", "1 Hora e 30", "1 Hora e 45", "2 Horas", "2 Horas e 15", "2 Horas e 30", "2 Horas e 45", "3 Horas", "4 Horas"].includes(bookingDuration) && (
                                 <option value={bookingDuration}>{bookingDuration}</option>
                               )}
@@ -2338,128 +2281,6 @@ export default function App() {
             </AnimatePresence>
           </aside>
         )}
-
-        {/* Mobile Bottom Sheet for Room Details */}
-        <AnimatePresence>
-          {showMobileDetails && selectedRoom && currentView === 'map' && (
-            <>
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setShowMobileDetails(false)}
-                className="md:hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[70]"
-              />
-              <motion.div 
-                initial={{ y: "100%" }}
-                animate={{ y: 0 }}
-                exit={{ y: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="md:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] shadow-2xl z-[80] max-h-[90vh] overflow-y-auto"
-              >
-                <div className="p-6 pb-24">
-                  <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" onClick={() => setShowMobileDetails(false)} />
-                  
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-2xl font-bold text-slate-900">{selectedRoom.name}</h3>
-                      <p className="text-slate-500 font-medium">{selectedRoom.department}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider ${
-                      getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Available' ? 'bg-emerald-100 text-emerald-600' :
-                      getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Pending' ? 'bg-amber-100 text-amber-600' :
-                      'bg-rose-100 text-rose-600'
-                    }`}>
-                      {getStatusLabel(getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime))}
-                    </span>
-                  </div>
-
-                  <div className="aspect-[16/9] rounded-2xl overflow-hidden mb-6 shadow-sm">
-                    <img 
-                      src={selectedRoom.image} 
-                      alt={selectedRoom.name} 
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-8">
-                    <Amenity icon={<Users size={18} />} label={`${selectedRoom.capacity} Pers.`} />
-                    <Amenity icon={<Wifi size={18} />} label="Eduroam" />
-                    <Amenity icon={<Plug size={18} />} label="Outlets" />
-                    <Amenity icon={<Monitor size={18} />} label="Smart TV" />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">DATE</p>
-                      <div className="flex items-center gap-2 text-slate-900 font-bold">
-                        <Calendar size={18} className="text-primary" />
-                        <span className="text-sm">{new Date(bookingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">TIME</p>
-                      <div className="flex items-center gap-2 text-slate-900 font-bold">
-                        <Clock size={18} className="text-primary" />
-                        <span className="text-sm">{bookingStartTime} - {(() => {
-                          const [h, m] = bookingStartTime.split(':').map(Number);
-                          let durationMins = 60;
-                          if (bookingDuration.includes('Hora')) {
-                            durationMins = parseInt(bookingDuration.split(' ')[0]) * 60;
-                            if (bookingDuration.includes('e')) durationMins += parseInt(bookingDuration.split('e ')[1]);
-                          } else {
-                            durationMins = parseInt(bookingDuration.split(' ')[0]);
-                          }
-                          const endTotal = h * 60 + m + durationMins;
-                          const endH = Math.floor(endTotal / 60);
-                          const endM = endTotal % 60;
-                          return `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
-                        })()}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={() => handleConfirmBooking()}
-                    className="w-full bg-primary text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-primary/25 flex items-center justify-center gap-3 active:scale-[0.98] transition-all"
-                  >
-                    Confirm Booking
-                    <ArrowRight size={20} />
-                  </button>
-                </div>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-slate-200 px-6 flex items-center justify-between z-[90]">
-          <BottomNavItem 
-            icon={<MapIcon size={24} />} 
-            label="Map" 
-            active={currentView === 'map'} 
-            onClick={() => setCurrentView('map')} 
-          />
-          <BottomNavItem 
-            icon={<CalendarCheck size={24} />} 
-            label="Bookings" 
-            active={currentView === 'reservations'} 
-            onClick={() => setCurrentView('reservations')} 
-          />
-          <BottomNavItem 
-            icon={<Calendar size={24} />} 
-            label="Schedules" 
-            active={currentView === 'schedules'} 
-            onClick={() => setCurrentView('schedules')} 
-          />
-          <BottomNavItem 
-            icon={<Settings size={24} />} 
-            label="Settings" 
-            active={false} 
-            onClick={() => {}} 
-          />
-        </nav>
 
         {/* Global Notifications */}
         <AnimatePresence>
@@ -2632,24 +2453,10 @@ function SidebarLink({
 
 function LegendItem({ color, label }: { color: string, label: string }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 whitespace-nowrap">
-      <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
-      <span className="text-[10px] md:text-xs font-bold tracking-wide">{label}</span>
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600">
+      <span className={`h-3 w-3 rounded-full ${color}`} />
+      <span className="text-xs font-semibold">{label}</span>
     </div>
-  );
-}
-
-function BottomNavItem({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void }) {
-  return (
-    <button 
-      onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-1 transition-all ${active ? 'text-primary' : 'text-slate-400'}`}
-    >
-      <div className={`p-1 rounded-xl transition-all ${active ? 'bg-primary/10' : ''}`}>
-        {icon}
-      </div>
-      <span className="text-[10px] font-bold">{label}</span>
-    </button>
   );
 }
 
@@ -2666,17 +2473,17 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMark
   return (
     <button 
       onClick={onClick}
-      className="absolute group z-20 -translate-x-1/2 -translate-y-1/2 p-4 -m-4"
+      className="absolute group z-20"
       style={{ top: room.top, left: room.left }}
     >
       <div className="flex flex-col items-center">
         <motion.div 
           animate={{ scale: isSelected ? 1.1 : 1 }}
-          className={`px-2 py-0.5 md:px-3 md:py-1 text-white text-[8px] md:text-[10px] font-bold rounded-lg shadow-lg mb-1 ${statusColor}`}
+          className={`px-3 py-1 text-white text-[10px] font-bold rounded-t-lg shadow-lg ${statusColor}`}
         >
-          R.{room.name.split(' ')[1]}
+          {room.name.split(' ')[1]}
         </motion.div>
-        <div className={`hidden md:flex h-10 w-10 items-center justify-center rounded-b-lg border-2 bg-white transition-all group-hover:scale-110 ${
+        <div className={`flex h-10 w-10 items-center justify-center rounded-b-lg border-2 bg-white transition-all group-hover:scale-110 ${
           isSelected ? `border-primary shadow-xl` : `border-slate-200`
         }`}>
           {status === 'Occupied' ? (
