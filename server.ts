@@ -29,58 +29,62 @@ if (!fs.existsSync(dataDir)) {
 
 let db: any;
 try {
-  // Alteração aqui: aponta para a subpasta /data mapeada no Docker
-  db = new Database(path.join(dataDir, "salas.db")); 
+  const dbPath = path.join(dataDir, "salas.db");
+  db = new Database(dbPath); 
   db.pragma('foreign_keys = ON');
-  console.log("Database initialized successfully at ./data/salas.db");
+  console.log(`[DB] Database initialized successfully at: ${path.resolve(dbPath)}`);
 } catch (error) {
-  console.error("Failed to initialize database:", error);
+  console.error("[DB] Failed to initialize database:", error);
   process.exit(1);
 }
 
 // Initialize database tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    role TEXT DEFAULT 'user' -- 'user', 'librarian', 'admin'
-  );
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      role TEXT DEFAULT 'user'
+    );
 
-  CREATE TABLE IF NOT EXISTS rooms (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    department TEXT NOT NULL,
-    status TEXT NOT NULL,
-    capacity INTEGER,
-    description TEXT,
-    operational_status TEXT DEFAULT 'Active',
-    image TEXT,
-    amenities TEXT DEFAULT '[]'
-  );
+    CREATE TABLE IF NOT EXISTS rooms (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      department TEXT NOT NULL,
+      status TEXT NOT NULL,
+      capacity INTEGER,
+      description TEXT,
+      operational_status TEXT DEFAULT 'Active',
+      image TEXT,
+      amenities TEXT DEFAULT '[]'
+    );
 
-  CREATE TABLE IF NOT EXISTS reservations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    room_id TEXT NOT NULL,
-    user_id INTEGER NOT NULL,
-    date TEXT NOT NULL,
-    start_time TEXT NOT NULL,
-    duration INTEGER NOT NULL, -- in minutes
-    subject TEXT NOT NULL,
-    status TEXT DEFAULT 'Pending',
-    FOREIGN KEY (room_id) REFERENCES rooms(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
+    CREATE TABLE IF NOT EXISTS reservations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_id TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      date TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      duration INTEGER NOT NULL,
+      subject TEXT NOT NULL,
+      status TEXT DEFAULT 'Pending',
+      FOREIGN KEY (room_id) REFERENCES rooms(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
 
-  CREATE TABLE IF NOT EXISTS otps (
-    email TEXT PRIMARY KEY,
-    code TEXT NOT NULL,
-    name TEXT,
-    expires_at DATETIME NOT NULL
-  );
-
-  -- Ensure rooms table has the new columns
-`);
+    CREATE TABLE IF NOT EXISTS otps (
+      email TEXT PRIMARY KEY,
+      code TEXT NOT NULL,
+      name TEXT,
+      expires_at DATETIME NOT NULL
+    );
+  `);
+  console.log("Database tables verified/created successfully");
+} catch (error) {
+  console.error("CRITICAL: Failed to create database tables:", error);
+  process.exit(1);
+}
 
 try { db.exec("ALTER TABLE rooms ADD COLUMN operational_status TEXT DEFAULT 'Active'"); } catch(e) {}
 try { db.exec("ALTER TABLE rooms ADD COLUMN image TEXT"); } catch(e) {}
@@ -515,8 +519,12 @@ async function startServer() {
 
       broadcast({ type: 'RESERVATIONS_UPDATED' });
       res.status(201).json(newReservation);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create reservation" });
+    } catch (error: any) {
+      console.error("Error creating reservation:", error);
+      res.status(500).json({ 
+        error: "Erro ao processar a reserva na base de dados.",
+        details: error.message 
+      });
     }
   });
 

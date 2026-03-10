@@ -8,7 +8,6 @@ import {
   CalendarCheck, 
   Library, 
   Settings, 
-  Zap, 
   DoorOpen, 
   Lock, 
   Clock, 
@@ -211,7 +210,10 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
           UA
         </div>
         
-        <h1 className="text-2xl font-bold text-slate-900 mb-1">SiReS - UA</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-1 text-center">
+          <span className="hidden md:inline">SiReS - Reserva de Salas das Bibliotecas UA</span>
+          <span className="md:hidden">SiReS Bibliotecas UA</span>
+        </h1>
         <p className="text-slate-500 text-sm mb-8 text-center">
           {step === 'request' 
             ? (mode === 'login' ? 'Inicie sessão com o seu e-mail da UA' : 'Crie a sua conta da UA')
@@ -1571,13 +1573,13 @@ export default function App() {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
         if (response.status === 409) {
-          const errorData = await response.json();
           setBookingStatus('error');
-          setBookingMessage(errorData.error);
+          setBookingMessage(errorData.error || 'Conflito de horário.');
           return;
         }
-        throw new Error("Failed to create reservation");
+        throw new Error(errorData.error || errorData.details || "Erro ao criar reserva");
       }
 
       const newRes = await response.json();
@@ -1602,9 +1604,9 @@ export default function App() {
       setBookingMessage('Reserva efetuada com sucesso! O seu pedido está pendente de aprovação.');
       
       setTimeout(() => setBookingStatus('idle'), 3000);
-    } catch (error) {
+    } catch (error: any) {
       setBookingStatus('error');
-      setBookingMessage('Lamentamos, mas ocorreu um erro ao processar a sua reserva.');
+      setBookingMessage(error.message || 'Lamentamos, mas ocorreu um erro ao processar a sua reserva.');
     }
   };
 
@@ -1719,7 +1721,10 @@ export default function App() {
             <div className="bg-primary text-white p-1.5 rounded-lg">
               <Building2 className="h-5 w-5 md:h-6 md:w-6" />
             </div>
-            <h2 className="text-base md:text-lg font-bold tracking-tight text-slate-900">SiReS - UA</h2>
+            <h2 className="text-base md:text-lg font-bold tracking-tight text-slate-900">
+              <span className="hidden md:inline">SiReS - Reserva de Salas das Bibliotecas UA</span>
+              <span className="md:hidden">SiReS Bibliotecas UA</span>
+            </h2>
           </div>
           <nav className="hidden md:flex items-center gap-8">
             <button 
@@ -1916,11 +1921,6 @@ export default function App() {
               <SidebarLink icon={<Settings size={20} />} label="Definições" />
             </div>
           </div>
-
-          <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all">
-            <Zap size={18} />
-            Reserva Rápida
-          </button>
         </aside>
 
         {/* Main Content Area */}
@@ -2748,10 +2748,6 @@ function ReservationCard({ res, onDelete }: { res: Reservation, onDelete: (id: s
               <Trash2 size={18} />
             </button>
           )}
-          
-          <button className="p-2 text-slate-400 hover:text-primary transition-colors">
-            <ChevronRight size={20} />
-          </button>
         </div>
       </div>
     </div>

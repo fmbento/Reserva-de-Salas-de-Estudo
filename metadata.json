@@ -1,5 +1,7 @@
 {
-  "name": "SiReS Bibliotecas UA",
-  "description": "Sistema de reserva de salas de estudo para a Universidade de Aveiro.",
-  "requestFramePermissions": []
+  "name": "Room Booking App",
+  "description": "A modern room booking application with real-time availability and department management.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
 }
