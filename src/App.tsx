@@ -48,6 +48,7 @@ const AVAILABLE_AMENITIES = [
   { id: 'Smart Screen', icon: <Monitor size={14} />, label: 'Ecrã Inteligente' },
   { id: 'Projetor', icon: <Projector size={14} />, label: 'Projetor' },
   { id: 'Ar Condicionado', icon: <Wind size={14} />, label: 'Ar Condicionado' },
+  { id: 'Smart TV', icon: <Monitor size={14} />, label: 'Smart TV' },
 ];
 
 interface Room {
@@ -210,7 +211,7 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
           UA
         </div>
         
-        <h1 className="text-2xl font-bold text-slate-900 mb-1">SiReS Bibliotecas UA</h1>
+        <h1 className="text-2xl font-bold text-slate-900 mb-1">SiReS - UA</h1>
         <p className="text-slate-500 text-sm mb-8 text-center">
           {step === 'request' 
             ? (mode === 'login' ? 'Inicie sessão com o seu e-mail da UA' : 'Crie a sua conta da UA')
@@ -1245,6 +1246,7 @@ export default function App() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [mobileShowDetails, setMobileShowDetails] = useState(false);
   
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
   const [bookingMessage, setBookingMessage] = useState<string>('');
@@ -1711,11 +1713,13 @@ export default function App() {
   return (
     <div className="flex h-screen w-full flex-col bg-background-light overflow-hidden">
       {/* Header */}
-      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 md:px-10 shrink-0 z-50">
+      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-10 shrink-0 z-50">
         <div className="flex items-center gap-8">
-          <div className="flex items-center gap-3 text-primary">
-            <Building2 className="h-8 w-8" />
-            <h2 className="text-lg font-bold tracking-tight text-slate-900">SiReS Bibliotecas UA</h2>
+          <div className="flex items-center gap-2 text-primary">
+            <div className="bg-primary text-white p-1.5 rounded-lg">
+              <Building2 className="h-5 w-5 md:h-6 md:w-6" />
+            </div>
+            <h2 className="text-base md:text-lg font-bold tracking-tight text-slate-900">SiReS - UA</h2>
           </div>
           <nav className="hidden md:flex items-center gap-8">
             <button 
@@ -1739,13 +1743,13 @@ export default function App() {
           </nav>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           <div className="relative hidden sm:block">
             <div className="flex items-center bg-slate-100 rounded-lg px-3 h-10 w-64">
               <Search className="h-5 w-5 text-slate-400" />
               <input 
                 type="text" 
-                placeholder="Pesquisar salas ou departamentos..." 
+                placeholder="Pesquisar salas..." 
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -1928,27 +1932,36 @@ export default function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="relative flex-1 overflow-hidden"
+                className="relative flex-1 overflow-hidden flex flex-col"
               >
-                {/* Legend */}
-                <div className="absolute top-4 left-4 z-10 flex gap-2 rounded-xl border border-white bg-white/90 p-1 shadow-lg backdrop-blur">
-                  <LegendItem color="bg-emerald-500" label="Disponível" />
-                  <LegendItem color="bg-amber-500" label="Pendente" />
-                  <LegendItem color="bg-rose-500" label="Ocupada" />
+                {/* Mobile Search Bar */}
+                <div className="md:hidden p-4 bg-transparent absolute top-0 left-0 right-0 z-30">
+                  <div className="flex items-center bg-white rounded-xl px-4 h-12 shadow-lg border border-slate-100">
+                    <Search className="h-5 w-5 text-slate-400 mr-2" />
+                    <input 
+                      type="text" 
+                      placeholder="Pesquisar salas ou edifícios" 
+                      className="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-slate-400"
+                    />
+                    <Filter className="h-5 w-5 text-primary ml-2" />
+                  </div>
+                </div>
+
+                {/* Legend / Filters */}
+                <div className="absolute top-20 md:top-4 left-4 z-10 flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+                  <div className="flex gap-2 rounded-xl border border-white bg-white/90 p-1 shadow-lg backdrop-blur">
+                    <LegendItem color="bg-emerald-500" label="DISPONÍVEL" />
+                    <LegendItem color="bg-amber-500" label="PENDENTE" />
+                    <LegendItem color="bg-rose-500" label="OCUPADA" />
+                  </div>
                 </div>
 
                 {/* Map Container */}
-                <div className="absolute inset-0 flex items-center justify-center p-8 md:p-12">
-                  <div className="relative aspect-[16/9] w-full max-w-5xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12 bg-[#94b395]">
+                  <div className="relative aspect-[9/16] md:aspect-[16/9] h-full md:w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/20 shadow-2xl overflow-hidden">
                     {/* Mock Floor Plan Background */}
-                    <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px]" />
-                    <img 
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuCbxYnpeFgrKCCtNhvNVWYcRUFOtGcXPDnDip-6rl1b1dSDK-8wOtJRcsUlpl15Yrzy7uzXt3e8BZVlpKaRsG6H3McutJ3Plv1dPQftc1vKhmmy2i0sqJwcoRrT1VITZBgTCLQn6ERjESvK6-v-eh0qWKdBXBQxzpLdiYvV6wUZLgTuNfr8z61ULNSYf2_TLqwq2HXRvSlPJdE3qhWflB0Nx7A8SUcHx_yKgDij92uhCNfvB6vPvd0-AMVJbOZ3zWPqy8lphG_2ex0" 
-                      alt="Planta do Piso" 
-                      className="h-full w-full object-cover opacity-30 grayscale"
-                      referrerPolicy="no-referrer"
-                    />
-
+                    <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
+                    
                     {/* Room Markers */}
                     {rooms.map((room) => {
                       const dynamicStatus = getDynamicRoomStatus(room.id, bookingDate, bookingStartTime);
@@ -1959,7 +1972,10 @@ export default function App() {
                           key={room.id} 
                           room={room} 
                           isSelected={selectedRoomId === room.id}
-                          onClick={() => setSelectedRoomId(room.id)}
+                          onClick={() => {
+                            setSelectedRoomId(room.id);
+                            setMobileShowDetails(true);
+                          }}
                           statusColor={statusColor}
                           status={dynamicStatus}
                         />
@@ -1968,8 +1984,8 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Map Controls */}
-                <div className="absolute bottom-6 right-6 flex flex-col gap-2">
+                {/* Map Controls (Desktop Only) */}
+                <div className="hidden md:flex absolute bottom-6 right-6 flex-col gap-2">
                   <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-lg hover:bg-slate-50">
                     <Plus size={20} />
                   </button>
@@ -2106,96 +2122,261 @@ export default function App() {
           </AnimatePresence>
         </main>
 
-        {/* Room Details Sidebar (Only visible on Map and Schedules view) */}
+        {/* Room Details Sidebar (Desktop) / Bottom Sheet (Mobile) */}
         {(currentView === 'map' || currentView === 'schedules') && selectedRoom && (
-          <aside className="w-full md:w-80 flex flex-col border-l border-slate-200 bg-white overflow-y-auto shrink-0">
-            <AnimatePresence mode="wait">
-              <motion.div 
-                key={selectedRoom.id}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="p-6"
-              >
-                <div className="mb-6 flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-xl font-bold text-slate-900">{selectedRoom.name}</h3>
-                      <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">
-                        {selectedRoom.capacity} pax
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-500">{selectedRoom.department}</p>
-                  </div>
-                  <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                    getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Available' ? 'bg-emerald-100 text-emerald-600' :
-                    getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Pending' ? 'bg-amber-100 text-amber-600' :
-                    'bg-rose-100 text-rose-600'
-                  }`}>
-                    {getStatusLabel(getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime))}
-                  </span>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="aspect-video overflow-hidden rounded-xl bg-slate-100">
-                    <img 
-                      src={selectedRoom.image} 
-                      alt={selectedRoom.name} 
-                      className="h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-
-                  <div>
-                    <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">Comodidades</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Amenity icon={<Users size={16} />} label={`${selectedRoom.capacity} pax`} />
-                      {AVAILABLE_AMENITIES.filter(a => selectedRoom.amenities.includes(a.id)).map(amenity => (
-                        <Amenity key={amenity.id} icon={React.cloneElement(amenity.icon as React.ReactElement, { size: 16 })} label={amenity.label} />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-4">
-                    <h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">Reservar este espaço</h4>
-                    {selectedRoom.operationalStatus !== 'Active' ? (
-                      <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-sm font-medium flex items-center gap-3">
-                        <AlertCircle size={20} />
-                        {selectedRoom.operationalStatus === 'Maintenance' 
-                          ? 'Esta sala encontra-se em manutenção e não pode ser reservada.' 
-                          : 'Esta sala encontra-se inativa.'}
+          <>
+            {/* Desktop Sidebar */}
+            <aside className="hidden md:flex w-80 flex-col border-l border-slate-200 bg-white overflow-y-auto shrink-0">
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  key={selectedRoom.id}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="p-6"
+                >
+                  <div className="mb-6 flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-slate-900">{selectedRoom.name}</h3>
+                        <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">
+                          {selectedRoom.capacity} pax
+                        </span>
                       </div>
-                    ) : (
-                      <div className="space-y-4">
+                      <p className="text-sm text-slate-500">{selectedRoom.department}</p>
+                    </div>
+                    <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                      getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Available' ? 'bg-emerald-100 text-emerald-600' :
+                      getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Pending' ? 'bg-amber-100 text-amber-600' :
+                      'bg-rose-100 text-rose-600'
+                    }`}>
+                      {getStatusLabel(getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime))}
+                    </span>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="aspect-video overflow-hidden rounded-xl bg-slate-100">
+                      <img 
+                        src={selectedRoom.image} 
+                        alt={selectedRoom.name} 
+                        className="h-full w-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+
+                    <div>
+                      <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">Comodidades</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Amenity icon={<Users size={16} />} label={`${selectedRoom.capacity} pax`} />
+                        {AVAILABLE_AMENITIES.filter(a => selectedRoom.amenities.includes(a.id)).map(amenity => (
+                          <Amenity key={amenity.id} icon={React.cloneElement(amenity.icon as React.ReactElement, { size: 16 })} label={amenity.label} />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-4">
+                      <h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">Reservar este espaço</h4>
+                      {selectedRoom.operationalStatus !== 'Active' ? (
+                        <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-sm font-medium flex items-center gap-3">
+                          <AlertCircle size={20} />
+                          {selectedRoom.operationalStatus === 'Maintenance' 
+                            ? 'Esta sala encontra-se em manutenção e não pode ser reservada.' 
+                            : 'Esta sala encontra-se inativa.'}
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Assunto / Porquê</label>
+                            <input 
+                              type="text" 
+                              placeholder="Ex: Estudo de Grupo, Reunião..."
+                              value={bookingSubject}
+                              onChange={(e) => setBookingSubject(e.target.value)}
+                              className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600">Selecionar Data</label>
+                            <input 
+                              type="date" 
+                              value={bookingDate}
+                              onChange={(e) => setBookingDate(e.target.value)}
+                              className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-600">Hora de Início</label>
+                              <select 
+                                value={bookingStartTime}
+                                onChange={(e) => setBookingStartTime(e.target.value)}
+                                className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                              >
+                                {Array.from({ length: 40 }, (_, i) => {
+                                  const h = Math.floor(i / 4) + 8;
+                                  const m = (i % 4) * 15;
+                                  const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                  return <option key={time} value={time}>{time}</option>;
+                                })}
+                              </select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-slate-600">Duração</label>
+                              <select 
+                                value={bookingDuration}
+                                onChange={(e) => setBookingDuration(e.target.value)}
+                                className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                              >
+                                <option value="15 Minutos">15 Minutos</option>
+                                <option value="30 Minutos">30 Minutos</option>
+                                <option value="45 Minutos">45 Minutos</option>
+                                <option value="1 Hora">1 Hora</option>
+                                <option value="1 Hora e 15">1 Hora e 15</option>
+                                <option value="1 Hora e 30">1 Hora e 30</option>
+                                <option value="1 Hora e 45">1 Hora e 45</option>
+                                <option value="2 Horas">2 Horas</option>
+                                <option value="2 Horas e 15">2 Horas e 15</option>
+                                <option value="2 Horas e 30">2 Horas e 30</option>
+                                <option value="2 Horas e 45">2 Horas e 45</option>
+                                <option value="3 Horas">3 Horas</option>
+                                <option value="4 Horas">4 Horas</option>
+                                {!["15 Minutos", "30 Minutos", "45 Minutos", "1 Hora", "1 Hora e 15", "1 Hora e 30", "1 Hora e 45", "2 Horas", "2 Horas e 15", "2 Horas e 30", "2 Horas e 45", "3 Horas", "4 Horas"].includes(bookingDuration) && (
+                                  <option value={bookingDuration}>{bookingDuration}</option>
+                                )}
+                              </select>
+                            </div>
+                          </div>
+
+                          <button 
+                            onClick={() => handleConfirmBooking()}
+                            disabled={
+                              bookingStatus === 'checking' || 
+                              selectedRoom.operationalStatus !== 'Active' ||
+                              getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                              (() => {
+                                const now = new Date();
+                                const [h, m] = bookingStartTime.split(':').map(Number);
+                                const bDate = new Date(bookingDate + 'T00:00:00');
+                                bDate.setHours(h, m, 0, 0);
+                                return bDate < now;
+                              })()
+                            }
+                            className={`w-full rounded-xl py-3 text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
+                              selectedRoom.operationalStatus !== 'Active' ||
+                              getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                              (() => {
+                                const now = new Date();
+                                const [h, m] = bookingStartTime.split(':').map(Number);
+                                const bDate = new Date(bookingDate + 'T00:00:00');
+                                bDate.setHours(h, m, 0, 0);
+                                return bDate < now;
+                              })()
+                                ? 'bg-slate-300 cursor-not-allowed shadow-none' 
+                                : 'bg-primary shadow-primary/25 hover:bg-primary/90'
+                            }`}
+                          >
+                            {bookingStatus === 'checking' ? (
+                              <>
+                                <Loader2 size={18} className="animate-spin" />
+                                A verificar...
+                              </>
+                            ) : (
+                              'Confirmar Reserva'
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </aside>
+
+            {/* Mobile Bottom Sheet */}
+            <AnimatePresence>
+              {mobileShowDetails && (
+                <>
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setMobileShowDetails(false)}
+                    className="md:hidden fixed inset-0 bg-black/20 z-40"
+                  />
+                  <motion.div 
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0 }}
+                    exit={{ y: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="md:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] z-50 max-h-[90vh] overflow-y-auto pb-20"
+                  >
+                    <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-4" />
+                    <div className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-2xl font-bold text-slate-900">{selectedRoom.name}</h3>
+                          <p className="text-sm text-slate-500">{selectedRoom.department}</p>
+                        </div>
+                        <span className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                          getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Available' ? 'bg-emerald-100 text-emerald-600' :
+                          getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Pending' ? 'bg-amber-100 text-amber-600' :
+                          'bg-rose-100 text-rose-600'
+                        }`}>
+                          {getStatusLabel(getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime))}
+                        </span>
+                      </div>
+
+                      <div className="aspect-video rounded-2xl overflow-hidden mb-6">
+                        <img src={selectedRoom.image} alt={selectedRoom.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mb-8">
+                        <Amenity icon={<Users size={16} />} label={`${selectedRoom.capacity} Pers.`} />
+                        {AVAILABLE_AMENITIES.filter(a => selectedRoom.amenities.includes(a.id)).map(amenity => (
+                          <Amenity key={amenity.id} icon={React.cloneElement(amenity.icon as React.ReactElement, { size: 16 })} label={amenity.label} />
+                        ))}
+                      </div>
+
+                      <div className="space-y-4 mb-8">
                         <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-slate-600">Assunto / Porquê</label>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assunto / Porquê</label>
                           <input 
                             type="text" 
                             placeholder="Ex: Estudo de Grupo, Reunião..."
                             value={bookingSubject}
                             onChange={(e) => setBookingSubject(e.target.value)}
-                            className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                            className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-primary focus:ring-primary"
                           />
                         </div>
 
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-medium text-slate-600">Selecionar Data</label>
-                          <input 
-                            type="date" 
-                            value={bookingDate}
-                            onChange={(e) => setBookingDate(e.target.value)}
-                            className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
-                          />
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">Hora de Início</label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative overflow-hidden">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Data</p>
+                            <div className="flex items-center gap-2 text-slate-900 font-bold pointer-events-none">
+                              <Calendar size={18} className="text-primary" />
+                              {(() => {
+                                const [y, m, d] = bookingDate.split('-').map(Number);
+                                const date = new Date(y, m - 1, d);
+                                return date.toLocaleDateString('pt-PT', { month: 'short', day: 'numeric' });
+                              })()}
+                            </div>
+                            <input 
+                              type="date" 
+                              value={bookingDate}
+                              onChange={(e) => setBookingDate(e.target.value)}
+                              className="absolute inset-0 opacity-0 cursor-pointer z-20 w-full h-full appearance-none"
+                              min={new Date().toISOString().split('T')[0]}
+                            />
+                          </div>
+                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Hora</p>
                             <select 
                               value={bookingStartTime}
                               onChange={(e) => setBookingStartTime(e.target.value)}
-                              className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
                             >
                               {Array.from({ length: 40 }, (_, i) => {
                                 const h = Math.floor(i / 4) + 8;
@@ -2204,83 +2385,113 @@ export default function App() {
                                 return <option key={time} value={time}>{time}</option>;
                               })}
                             </select>
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">Duração</label>
-                            <select 
-                              value={bookingDuration}
-                              onChange={(e) => setBookingDuration(e.target.value)}
-                              className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
-                            >
-                              <option value="15 Minutos">15 Minutos</option>
-                              <option value="30 Minutos">30 Minutos</option>
-                              <option value="45 Minutos">45 Minutos</option>
-                              <option value="1 Hora">1 Hora</option>
-                              <option value="1 Hora e 15">1 Hora e 15</option>
-                              <option value="1 Hora e 30">1 Hora e 30</option>
-                              <option value="1 Hora e 45">1 Hora e 45</option>
-                              <option value="2 Horas">2 Horas</option>
-                              <option value="2 Horas e 15">2 Horas e 15</option>
-                              <option value="2 Horas e 30">2 Horas e 30</option>
-                              <option value="2 Horas e 45">2 Horas e 45</option>
-                              <option value="3 Horas">3 Horas</option>
-                              <option value="4 Horas">4 Horas</option>
-                              {/* Fallback for custom drag durations */}
-                              {!["15 Minutos", "30 Minutos", "45 Minutos", "1 Hora", "1 Hora e 15", "1 Hora e 30", "1 Hora e 45", "2 Horas", "2 Horas e 15", "2 Horas e 30", "2 Horas e 45", "3 Horas", "4 Horas"].includes(bookingDuration) && (
-                                <option value={bookingDuration}>{bookingDuration}</option>
-                              )}
-                            </select>
+                            <div className="flex items-center gap-2 text-slate-900 font-bold">
+                              <Clock size={18} className="text-primary" />
+                              {bookingStartTime}
+                            </div>
                           </div>
                         </div>
 
-                        <button 
-                          onClick={() => handleConfirmBooking()}
-                          disabled={
-                            bookingStatus === 'checking' || 
-                            selectedRoom.operationalStatus !== 'Active' ||
-                            getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
-                            (() => {
-                              const now = new Date();
-                              const [h, m] = bookingStartTime.split(':').map(Number);
-                              const bDate = new Date(bookingDate + 'T00:00:00');
-                              bDate.setHours(h, m, 0, 0);
-                              return bDate < now;
-                            })()
-                          }
-                          className={`w-full rounded-xl py-3 text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
-                            selectedRoom.operationalStatus !== 'Active' ||
-                            getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
-                            (() => {
-                              const now = new Date();
-                              const [h, m] = bookingStartTime.split(':').map(Number);
-                              const bDate = new Date(bookingDate + 'T00:00:00');
-                              bDate.setHours(h, m, 0, 0);
-                              return bDate < now;
-                            })()
-                              ? 'bg-slate-300 cursor-not-allowed shadow-none' 
-                              : 'bg-primary shadow-primary/25 hover:bg-primary/90'
-                          }`}
-                        >
-                          {bookingStatus === 'checking' ? (
-                            <>
-                              <Loader2 size={18} className="animate-spin" />
-                              A verificar...
-                            </>
-                          ) : (
-                            'Confirmar Reserva'
-                          )}
-                        </button>
-                        <p className="text-center text-[10px] text-slate-400">
-                          Validação necessária via código QR na entrada da sala.
-                        </p>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Duração</label>
+                          <select 
+                            value={bookingDuration}
+                            onChange={(e) => setBookingDuration(e.target.value)}
+                            className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 focus:border-primary focus:ring-primary appearance-none"
+                          >
+                            <option value="15 Minutos">15 Minutos</option>
+                            <option value="30 Minutos">30 Minutos</option>
+                            <option value="45 Minutos">45 Minutos</option>
+                            <option value="1 Hora">1 Hora</option>
+                            <option value="1 Hora e 15">1 Hora e 15</option>
+                            <option value="1 Hora e 30">1 Hora e 30</option>
+                            <option value="1 Hora e 45">1 Hora e 45</option>
+                            <option value="2 Horas">2 Horas</option>
+                            <option value="2 Horas e 15">2 Horas e 15</option>
+                            <option value="2 Horas e 30">2 Horas e 30</option>
+                            <option value="2 Horas e 45">2 Horas e 45</option>
+                            <option value="3 Horas">3 Horas</option>
+                            <option value="4 Horas">4 Horas</option>
+                          </select>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
+
+                      <button 
+                        onClick={() => handleConfirmBooking()}
+                        disabled={
+                          bookingStatus === 'checking' || 
+                          selectedRoom.operationalStatus !== 'Active' ||
+                          getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                          (() => {
+                            const now = new Date();
+                            const [h, m] = bookingStartTime.split(':').map(Number);
+                            const bDate = new Date(bookingDate + 'T00:00:00');
+                            bDate.setHours(h, m, 0, 0);
+                            return bDate < now;
+                          })()
+                        }
+                        className={`w-full py-4 rounded-2xl font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2 ${
+                          selectedRoom.operationalStatus !== 'Active' ||
+                          getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                          (() => {
+                            const now = new Date();
+                            const [h, m] = bookingStartTime.split(':').map(Number);
+                            const bDate = new Date(bookingDate + 'T00:00:00');
+                            bDate.setHours(h, m, 0, 0);
+                            return bDate < now;
+                          })()
+                            ? 'bg-slate-300 text-slate-500 shadow-none cursor-not-allowed' 
+                            : 'bg-primary text-white shadow-primary/25 hover:bg-primary/90'
+                        }`}
+                      >
+                        {bookingStatus === 'checking' ? (
+                          <>
+                            <Loader2 size={20} className="animate-spin" />
+                            A verificar...
+                          </>
+                        ) : (
+                          <>
+                            Confirmar Reserva <ArrowRight size={20} />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
             </AnimatePresence>
-          </aside>
+          </>
         )}
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-slate-100 flex items-center justify-around px-4 z-[60]">
+          <button 
+            onClick={() => {
+              setCurrentView('map');
+              setMobileShowDetails(false);
+            }}
+            className={`flex flex-col items-center gap-1 ${currentView === 'map' ? 'text-primary' : 'text-slate-400'}`}
+          >
+            <MapIcon size={24} />
+            <span className="text-[10px] font-bold">Mapa</span>
+          </button>
+          <button 
+            onClick={() => {
+              setCurrentView('reservations');
+              setMobileShowDetails(false);
+            }}
+            className={`flex flex-col items-center gap-1 ${currentView === 'reservations' ? 'text-primary' : 'text-slate-400'}`}
+          >
+            <Library size={24} />
+            <span className="text-[10px] font-bold">Reservas</span>
+          </button>
+          <button 
+            className={`flex flex-col items-center gap-1 text-slate-400`}
+          >
+            <Settings size={24} />
+            <span className="text-[10px] font-bold">Definições</span>
+          </button>
+        </nav>
 
         {/* Global Notifications */}
         <AnimatePresence>
@@ -2479,21 +2690,10 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMark
       <div className="flex flex-col items-center">
         <motion.div 
           animate={{ scale: isSelected ? 1.1 : 1 }}
-          className={`px-3 py-1 text-white text-[10px] font-bold rounded-t-lg shadow-lg ${statusColor}`}
+          className={`px-3 py-1 text-white text-[10px] font-bold rounded-full shadow-lg border-2 border-white ${statusColor}`}
         >
-          {room.name.split(' ')[1]}
+          R.{room.id}
         </motion.div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-b-lg border-2 bg-white transition-all group-hover:scale-110 ${
-          isSelected ? `border-primary shadow-xl` : `border-slate-200`
-        }`}>
-          {status === 'Occupied' ? (
-            <Lock className="h-5 w-5 text-rose-500" />
-          ) : status === 'Pending' ? (
-            <Clock className="h-5 w-5 text-amber-500" />
-          ) : (
-            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-          )}
-        </div>
       </div>
     </button>
   );
