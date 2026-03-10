@@ -7,6 +7,8 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import nodemailer from "nodemailer";
 import * as ics from 'ics';
+import { WebSocketServer, WebSocket } from "ws";
+import http from "http";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -162,10 +164,12 @@ try {
 }
 
 // Nodemailer Transporter
+const smtpPort = process.env.SMTP_PORT || '465';
+console.log(`[AUTH] SMTP Config: Host=${process.env.SMTP_HOST || 'smtp.gmail.com'}, Port=${smtpPort}, User=${process.env.SMTP_USER ? 'Set' : 'Not Set'}, Pass=${process.env.SMTP_PASS ? 'Set' : 'Not Set'}`);
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '465'),
-  secure: process.env.SMTP_PORT === '465',
+  port: parseInt(smtpPort),
+  secure: smtpPort === '465',
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -319,7 +323,7 @@ async function sendOtpEmail(email: string, code: string) {
       to: email,
       subject: "Código de Acesso - SiReS Bibliotecas UA",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; rounded: 10px;">
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
           <p>Olá,</p>
           <p>Utilize o seguinte código para aceder à plataforma de reserva de salas:</p>
@@ -333,14 +337,27 @@ async function sendOtpEmail(email: string, code: string) {
       `,
     });
     console.log(`[AUTH] OTP email sent to ${email}`);
+    return true;
   } catch (error) {
     console.error(`[AUTH] Failed to send OTP email to ${email}:`, error);
-    throw error;
+    console.log(`[AUTH] FALLBACK: OTP for ${email} is ${code} (Check SMTP credentials)`);
+    return false;
   }
 }
 
 async function startServer() {
   const app = express();
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ server });
+
+  const broadcast = (data: any) => {
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(data));
+      }
+    });
+  };
+
   app.use(express.json());
 
   // Health check endpoint
@@ -375,11 +392,19 @@ async function startServer() {
         VALUES (?, ?, ?, ?)
       `).run(email, code, name || null, expiresAt);
 
-      await sendOtpEmail(email, code);
-      res.json({ success: true, message: "Código enviado para o seu e-mail." });
-    } catch (error) {
-      console.error("Error saving OTP or sending email:", error);
-      res.status(500).json({ error: "Erro ao processar o pedido de acesso." });
+      const emailSent = await sendOtpEmail(email, code);
+      res.json({ 
+        success: true, 
+        message: emailSent 
+          ? "Código enviado para o seu e-mail." 
+          : "Ocorreu um erro ao enviar o e-mail, mas o código foi gerado. Por favor, contacte o administrador ou verifique os logs." 
+      });
+    } catch (error: any) {
+      console.error("[AUTH] Error in request-otp:", error);
+      res.status(500).json({ 
+        error: "Erro ao processar o pedido de acesso.",
+        details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+      });
     }
   });
 
@@ -415,6 +440,7 @@ async function startServer() {
 
     if (isNewUser && user) {
       sendWelcomeEmail(user.email, user.name).catch(console.error);
+      broadcast({ type: 'USERS_UPDATED' });
     }
 
     res.json(user);
@@ -487,6 +513,7 @@ async function startServer() {
         sendReservationPendingEmail(user.email, room.name, date, start_time, duration).catch(console.error);
       }
 
+      broadcast({ type: 'RESERVATIONS_UPDATED' });
       res.status(201).json(newReservation);
     } catch (error) {
       res.status(500).json({ error: "Failed to create reservation" });
@@ -510,6 +537,7 @@ async function startServer() {
       }
 
       db.prepare("DELETE FROM reservations WHERE id = ?").run(id);
+      broadcast({ type: 'RESERVATIONS_UPDATED' });
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: "Failed to delete reservation" });
@@ -547,6 +575,7 @@ async function startServer() {
       const result = stmt.run(name, department, capacity, opStatus, image, JSON.stringify(amenities), id);
       
       if (result.changes > 0) {
+        broadcast({ type: 'ROOMS_UPDATED' });
         res.json({ success: true });
       } else {
         res.status(404).json({ error: "Room not found" });
@@ -576,6 +605,7 @@ async function startServer() {
         sendReservationStatusEmail(reservation.user_email, reservation.room_name, reservation, status).catch(console.error);
       }
 
+      broadcast({ type: 'RESERVATIONS_UPDATED' });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to update status" });
@@ -597,7 +627,7 @@ async function startServer() {
   }
 
   const PORT = 3000;
-  app.listen(PORT, "0.0.0.0", () => {
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }

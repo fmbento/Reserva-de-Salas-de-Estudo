@@ -1291,54 +1291,78 @@ export default function App() {
   }, [allUsers]);
 
   // Fetch initial data
+  const fetchData = async () => {
+    try {
+      const [roomsRes, reservationsRes, allUsersRes] = await Promise.all([
+        fetch('/api/rooms'),
+        fetch('/api/reservations'),
+        fetch('/api/users')
+      ]);
+
+      const roomsData = await roomsRes.json();
+      const reservationsData = await reservationsRes.json();
+      const allUsersData = await allUsersRes.json();
+      console.log("Fetched all users:", allUsersData);
+      setAllUsers(allUsersData);
+
+      // Map database rooms to frontend Room interface
+      const mappedRooms = roomsData.map((r: any) => ({
+        ...r,
+        operationalStatus: r.operational_status || 'Active',
+        amenities: r.amenities ? JSON.parse(r.amenities) : ['Eduroam', 'Tomadas'],
+        image: r.image || 'https://picsum.photos/seed/' + r.id + '/800/600',
+        top: r.id === '101' ? '20%' : r.id === '102' ? '20%' : r.id === '201' ? '50%' : '70%',
+        left: r.id === '101' ? '15%' : r.id === '102' ? '30%' : r.id === '201' ? '45%' : '70%'
+      }));
+
+      // Map database reservations to frontend Reservation interface
+      const mappedReservations = reservationsData.map((r: any) => ({
+        id: r.id.toString(),
+        roomId: r.room_id,
+        roomName: r.room_name,
+        userId: r.user_id,
+        date: r.date,
+        startTime: r.start_time,
+        duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
+        subject: r.subject,
+        status: r.status
+      }));
+
+      setRooms(mappedRooms);
+      setReservations(mappedReservations);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    }
+  };
+
   useEffect(() => {
     if (!isLoggedIn) return;
+    fetchData();
 
-    const fetchData = async () => {
+    // WebSocket for real-time updates
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}`;
+    const socket = new WebSocket(wsUrl);
+
+    socket.onmessage = (event) => {
       try {
-        const [roomsRes, reservationsRes, allUsersRes] = await Promise.all([
-          fetch('/api/rooms'),
-          fetch('/api/reservations'),
-          fetch('/api/users')
-        ]);
-
-        const roomsData = await roomsRes.json();
-        const reservationsData = await reservationsRes.json();
-        const allUsersData = await allUsersRes.json();
-        console.log("Fetched all users:", allUsersData);
-        setAllUsers(allUsersData);
-
-        // Map database rooms to frontend Room interface
-        const mappedRooms = roomsData.map((r: any) => ({
-          ...r,
-          operationalStatus: r.operational_status || 'Active',
-          amenities: r.amenities ? JSON.parse(r.amenities) : ['Eduroam', 'Tomadas'],
-          image: r.image || 'https://picsum.photos/seed/' + r.id + '/800/600',
-          top: r.id === '101' ? '20%' : r.id === '102' ? '20%' : r.id === '201' ? '50%' : '70%',
-          left: r.id === '101' ? '15%' : r.id === '102' ? '30%' : r.id === '201' ? '45%' : '70%'
-        }));
-
-        // Map database reservations to frontend Reservation interface
-        const mappedReservations = reservationsData.map((r: any) => ({
-          id: r.id.toString(),
-          roomId: r.room_id,
-          roomName: r.room_name,
-          userId: r.user_id,
-          date: r.date,
-          startTime: r.start_time,
-          duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
-          subject: r.subject,
-          status: r.status
-        }));
-
-        setRooms(mappedRooms);
-        setReservations(mappedReservations);
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
+        const data = JSON.parse(event.data);
+        if (data.type === 'RESERVATIONS_UPDATED' || data.type === 'ROOMS_UPDATED' || data.type === 'USERS_UPDATED') {
+          console.log(`[WS] Received ${data.type}, re-fetching data...`);
+          fetchData();
+        }
+      } catch (err) {
+        console.error("[WS] Error parsing message:", err);
       }
     };
 
-    fetchData();
+    socket.onopen = () => console.log("[WS] Connected to real-time updates");
+    socket.onclose = () => console.log("[WS] Disconnected from real-time updates");
+    socket.onerror = (err) => console.error("[WS] WebSocket error:", err);
+
+    return () => {
+      socket.close();
+    };
   }, [isLoggedIn]);
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId) || rooms[0];
