@@ -17,6 +17,9 @@ RUN npm install
 # Copia o resto do código
 COPY . .
 
+# Coloca o script de atualização do container docker a partir do repositorio como executável
+RUN chmod +x ./update_from_gh_repo.sh
+
 # Faz o build do Vite (gera a pasta /dist)
 RUN npm run build
 
