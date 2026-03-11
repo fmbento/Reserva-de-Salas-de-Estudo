@@ -1248,6 +1248,7 @@ export default function App() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [mapScale, setMapScale] = useState(1);
   const [mobileShowDetails, setMobileShowDetails] = useState(false);
   
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
@@ -1574,6 +1575,12 @@ export default function App() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        if (response.status === 401) {
+          handleLogout();
+          setBookingStatus('error');
+          setBookingMessage('A sua sessão expirou ou o utilizador não foi encontrado. Por favor, faça login novamente.');
+          return;
+        }
         if (response.status === 409) {
           setBookingStatus('error');
           setBookingMessage(errorData.error || 'Conflito de horário.');
@@ -1959,10 +1966,15 @@ export default function App() {
                 </div>
 
                 {/* Map Container */}
-                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12 bg-[#94b395] cursor-pointer"
-                  onClick={() => setCurrentView('map')}
+                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12 bg-[#94b395] cursor-default"
                 >
-                  <div className="relative aspect-[9/16] md:aspect-[16/9] h-full md:w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/20 shadow-2xl overflow-hidden">
+                  <div 
+                    className="relative aspect-[9/16] md:aspect-[16/9] h-full md:w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/20 shadow-2xl overflow-hidden"
+                    style={{ 
+                      transform: `scale(${mapScale})`,
+                      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  >
                     {/* Mock Floor Plan Background */}
                     <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
                     
@@ -1990,14 +2002,19 @@ export default function App() {
 
                 {/* Map Controls (Desktop Only) */}
                 <div className="hidden md:flex absolute bottom-6 right-6 flex-col gap-2">
-                  <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-lg hover:bg-slate-50">
+                  <button 
+                    onClick={() => setMapScale(prev => Math.min(prev + 0.2, 3))}
+                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    title="Aumentar Zoom"
+                  >
                     <Plus size={20} />
                   </button>
-                  <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-lg hover:bg-slate-50">
+                  <button 
+                    onClick={() => setMapScale(prev => Math.max(prev - 0.2, 0.5))}
+                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    title="Diminuir Zoom"
+                  >
                     <Minus size={20} />
-                  </button>
-                  <button className="mt-2 flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-primary shadow-lg hover:bg-slate-50">
-                    <Crosshair size={20} />
                   </button>
                 </div>
               </motion.div>
@@ -2694,7 +2711,7 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMark
       <div className="flex flex-col items-center">
         <motion.div 
           animate={{ scale: isSelected ? 1.1 : 1 }}
-          className={`px-3 py-1 text-white text-[10px] font-bold rounded-full shadow-lg border-2 border-white ${statusColor}`}
+          className={`px-3 py-1 text-white text-[10px] font-bold rounded-full shadow-lg border-2 ${isSelected ? 'border-rose-600' : 'border-white'} ${statusColor}`}
         >
           R.{room.id}
         </motion.div>

@@ -468,7 +468,34 @@ async function startServer() {
 
   app.post("/api/reservations", (req, res) => {
     const { room_id, user_id, date, start_time, duration, subject } = req.body;
-    const uid = user_id || 1;
+    
+    if (!room_id || !date || !start_time || !duration) {
+      return res.status(400).json({ error: "Dados da reserva incompletos." });
+    }
+
+    // Ensure we have a valid user_id
+    let uid = user_id;
+    if (!uid) {
+      // Try to find the first user as fallback if none provided (should not happen in normal flow)
+      const firstUser = db.prepare("SELECT id FROM users LIMIT 1").get() as { id: number } | undefined;
+      if (firstUser) {
+        uid = firstUser.id;
+      } else {
+        return res.status(401).json({ error: "Utilizador não identificado e nenhum utilizador encontrado na base de dados." });
+      }
+    }
+
+    // Verify user exists to avoid foreign key failure
+    const userExists = db.prepare("SELECT id FROM users WHERE id = ?").get(uid);
+    if (!userExists) {
+      return res.status(401).json({ error: "Utilizador não encontrado. Por favor, faça login novamente." });
+    }
+
+    // Verify room exists to avoid foreign key failure
+    const roomExists = db.prepare("SELECT id FROM rooms WHERE id = ?").get(room_id);
+    if (!roomExists) {
+      return res.status(404).json({ error: "Sala não encontrada." });
+    }
     
     const parseTime = (t: string) => {
       const [h, m] = t.split(':').map(Number);
@@ -506,7 +533,7 @@ async function startServer() {
       const result = db.prepare(`
         INSERT INTO reservations (room_id, user_id, date, start_time, duration, subject, status) 
         VALUES (?, ?, ?, ?, ?, ?, 'Pending')
-      `).run(room_id, uid, date, start_time, duration, subject);
+      `).run(room_id, uid, date, start_time, duration, subject || 'Sem assunto');
       
       const newReservation = db.prepare("SELECT * FROM reservations WHERE id = ?").get(result.lastInsertRowid);
       
