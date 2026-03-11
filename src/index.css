@@ -19,3 +19,15 @@ body {
 #root {
   width: 100%;
 }
+
+button, 
+[role="button"],
+a,
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+select,
+label,
+summary {
+  cursor: pointer;
+}

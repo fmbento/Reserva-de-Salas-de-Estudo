@@ -1055,7 +1055,7 @@ const SchedulesView = ({
                 
                 {isSearchFocused && (
                   <>
-                    <div className="fixed inset-0 z-10" onClick={() => setIsSearchFocused(false)} />
+                    <div className="fixed inset-0 z-10 cursor-pointer" onClick={() => setIsSearchFocused(false)} />
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-20 max-h-60 overflow-y-auto">
                       {filteredRooms.map(room => (
                         <button
@@ -1936,7 +1936,9 @@ export default function App() {
               >
                 {/* Mobile Search Bar */}
                 <div className="md:hidden p-4 bg-transparent absolute top-0 left-0 right-0 z-30">
-                  <div className="flex items-center bg-white rounded-xl px-4 h-12 shadow-lg border border-slate-100">
+                  <div className="flex items-center bg-white rounded-xl px-4 h-12 shadow-lg border border-slate-100 cursor-pointer"
+                    onClick={() => setCurrentView('map')}
+                  >
                     <Search className="h-5 w-5 text-slate-400 mr-2" />
                     <input 
                       type="text" 
@@ -1957,7 +1959,9 @@ export default function App() {
                 </div>
 
                 {/* Map Container */}
-                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12 bg-[#94b395]">
+                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12 bg-[#94b395] cursor-pointer"
+                  onClick={() => setCurrentView('map')}
+                >
                   <div className="relative aspect-[9/16] md:aspect-[16/9] h-full md:w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/20 shadow-2xl overflow-hidden">
                     {/* Mock Floor Plan Background */}
                     <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
@@ -2304,7 +2308,7 @@ export default function App() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onClick={() => setMobileShowDetails(false)}
-                    className="md:hidden fixed inset-0 bg-black/20 z-40"
+                    className="md:hidden fixed inset-0 bg-black/20 z-40 cursor-pointer"
                   />
                   <motion.div 
                     initial={{ y: '100%' }}
@@ -2598,7 +2602,7 @@ export default function App() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setReservationToDelete(null)}
-                className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm cursor-pointer"
               />
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
