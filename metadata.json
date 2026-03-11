@@ -1,7 +1,5 @@
 {
-  "name": "Room Booking App",
+  "name": "SiReS - Reserva de Salas das Bibliotecas UA",
   "description": "A modern room booking application with real-time availability and department management.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
+  "requestFramePermissions": []
 }
