@@ -289,6 +289,8 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
                   key={idx}
                   id={`otp-${idx}`}
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   maxLength={1}
                   value={digit}
                   onChange={(e) => handleOtpChange(idx, e.target.value)}
@@ -681,6 +683,7 @@ const ManageRoomsView = ({
                     </div>
                     <input 
                       type="number" 
+                      inputMode="numeric"
                       value={editCapacity}
                       onChange={(e) => setEditCapacity(parseInt(e.target.value))}
                       className="w-full pl-11 rounded-xl border-slate-200 bg-slate-50 text-sm font-bold focus:border-primary focus:ring-primary"
