@@ -1,9 +1,5 @@
 # SiReS Bibliotecas UA - Room Booking System
 
-<div align="center">
-  <img width="1200" height="475" alt="SiReS" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 ## 📋 Overview
 
 **SiReS Bibliotecas UA** is a comprehensive room and study space reservation system designed for the University of Aveiro. It provides a seamless booking experience for students and faculty, allowing them to reserve study rooms, laboratories, and amphitheaters efficiently.
@@ -338,7 +334,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 **Filipe Bento**
 - GitHub: [@fmbento](https://github.com/fmbento)
-- Email: filben@gmail.com
 
 ---
 
