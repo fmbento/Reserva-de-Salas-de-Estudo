@@ -11,6 +11,7 @@ The system features:
 - 🗓️ Calendar integration (ICS format)
 - 👥 Role-based access control (User, Librarian, Admin)
 - 🌐 WebSocket support for real-time updates
+- 🎨 Official UA branding and improved Dark Mode
 - 📱 Responsive web interface
 - 🐳 Docker support for easy deployment
 
@@ -290,7 +291,7 @@ Connected clients receive instant updates without page refresh.
 ### Frontend
 - **React** - UI framework
 - **Vite** - Build tool
-- **Tailwind CSS** - Styling
+- **Tailwind CSS v4** - Styling with modern engine
 - **Lucide React** - Icons
 - **Motion** - Animations
 - **Recharts** - Data visualization
@@ -357,6 +358,13 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.2.0 (March 25, 2026)
+- **Official Branding**: Integrated official University of Aveiro logo in login and navigation.
+- **Tailwind CSS v4**: Upgraded styling engine for better performance and modern features.
+- **Enhanced Dark Mode**: Improved theme switching with persistent preferences and smooth transitions.
+- **UX Improvements**: Added click-outside detection for dropdown menus and improved mobile navigation.
+- **Bug Fixes**: Resolved issues with theme persistence and UI responsiveness.
+
 ### Version 0.1.0
 - Initial release
 - Core reservation system
@@ -368,7 +376,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** March 23, 2026
+**Last Updated:** March 25, 2026
 ```
 
 This README provides:
