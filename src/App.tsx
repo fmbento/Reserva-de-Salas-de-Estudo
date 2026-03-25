@@ -401,6 +401,7 @@ const BackofficeView = ({
   lang: string
 }) => {
   const t = translations[lang as keyof typeof translations];
+  const AVAILABLE_AMENITIES = getAvailableAmenities(t);
   const now = new Date();
   
   const futureReservations = reservations.filter(res => {
@@ -519,6 +520,7 @@ const ManageRoomsView = ({
   lang: string
 }) => {
   const t = translations[lang as keyof typeof translations];
+  const AVAILABLE_AMENITIES = getAvailableAmenities(t);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(rooms[0]?.id || null);
   const [filter, setFilter] = useState<'All' | 'Active' | 'Maintenance'>('All');
   
@@ -2692,21 +2694,21 @@ export default function App() {
                 <p className="text-slate-600 mb-6">
                   {conflictModal.type === 'room' ? (
                     <>
-                      {t.roomAvailableUntil.replace('{time}', conflictModal.availableUntil)} 
+                      {t.roomAvailableUntil.replace('{time}', conflictModal.availableUntil || '')} 
                       <br />
-                      {t.acceptReducedDuration.replace('{duration}', conflictModal.newDuration.toString())}
+                      {t.acceptReducedDuration.replace('{duration}', (conflictModal.newDuration || 0).toString())}
                     </>
                   ) : conflictModal.type === 'user_start' ? (
                     <>
-                      {t.userReservationEndsAt.replace('{time}', conflictModal.availableFrom)} 
+                      {t.userReservationEndsAt.replace('{time}', conflictModal.availableFrom || '')} 
                       <br />
-                      {t.changeStartTimeTo.replace('{time}', conflictModal.newStartTime)}
+                      {t.changeStartTimeTo.replace('{time}', conflictModal.newStartTime || '')}
                     </>
                   ) : (
                     <>
-                      {t.userReservationStartsAt.replace('{time}', conflictModal.availableUntil)} 
+                      {t.userReservationStartsAt.replace('{time}', conflictModal.availableUntil || '')} 
                       <br />
-                      {t.reduceDurationTo.replace('{duration}', conflictModal.newDuration.toString())}
+                      {t.reduceDurationTo.replace('{duration}', (conflictModal.newDuration || 0).toString())}
                     </>
                   )}
                 </p>
