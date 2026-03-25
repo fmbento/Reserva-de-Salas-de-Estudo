@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Building2, 
   Search, 
@@ -37,7 +37,9 @@ import {
   ArrowRight,
   Sun,
   Moon,
-  Globe
+  Globe,
+  ShieldCheck,
+  UserX
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cookies from 'js-cookie';
@@ -85,7 +87,7 @@ interface UserData {
   id: number;
   name: string;
   email: string;
-  role: 'user' | 'librarian' | 'admin';
+  role: 'user' | 'bibliotecário' | 'admin' | 'blocked';
 }
 
 const ThemeToggle = ({ theme, toggleTheme }: { theme: 'light' | 'dark', toggleTheme: () => void }) => (
@@ -387,17 +389,219 @@ const Login = ({
   );
 };
 
+const ManageUsersView = ({ lang, onBack }: { lang: string, onBack: () => void }) => {
+  const t = translations[lang as keyof typeof translations];
+  const [searchEmail, setSearchEmail] = useState('');
+  const [foundUser, setFoundUser] = useState<UserData | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchEmail) return;
+
+    setIsSearching(true);
+    setError(null);
+    setSuccess(null);
+    setFoundUser(null);
+
+    try {
+      const res = await fetch(`/api/users/search?email=${encodeURIComponent(searchEmail)}&lang=${lang}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || t.errorOccurred);
+      }
+
+      setFoundUser(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleUpdateRole = async (newRole: string) => {
+    if (!foundUser) return;
+
+    setIsUpdating(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/users/${foundUser.id}/role`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole, lang })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || t.errorOccurred);
+      }
+
+      setFoundUser({ ...foundUser, role: newRole as any });
+      setSuccess(data.message);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  return (
+    <div className="h-full flex flex-col bg-slate-50 dark:bg-slate-950">
+      <div className="p-8 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+        <div className="max-w-4xl mx-auto flex items-center gap-4">
+          <button 
+            onClick={onBack}
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500 dark:text-slate-400"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <div>
+            <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{t.manageUsers}</h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">{t.manageUsersSubtitle}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-8">
+        <div className="max-w-4xl mx-auto space-y-8">
+          {/* Search Section */}
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800">
+            <form onSubmit={handleSearch} className="flex gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                <input
+                  type="email"
+                  value={searchEmail}
+                  onChange={(e) => setSearchEmail(e.target.value)}
+                  placeholder={t.searchUserPlaceholder}
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20 transition-all"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="bg-primary text-white px-8 rounded-2xl font-bold hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSearching ? <Loader2 size={20} className="animate-spin" /> : t.search}
+              </button>
+            </form>
+
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl text-sm font-medium flex items-center gap-2"
+              >
+                <AlertCircle size={18} />
+                {error}
+              </motion.div>
+            )}
+
+            {success && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-2xl text-sm font-medium flex items-center gap-2"
+              >
+                <CheckCircle2 size={18} />
+                {success}
+              </motion.div>
+            )}
+          </div>
+
+          {/* User Details & Role Update */}
+          {foundUser && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800"
+            >
+              <div className="flex items-center gap-6 mb-8">
+                <div className="h-20 w-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary">
+                  <User size={40} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{foundUser.name}</h2>
+                  <p className="text-slate-500 dark:text-slate-400">{foundUser.email}</p>
+                  <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                    {foundUser.role === 'admin' ? 'Administrator' : foundUser.role === 'bibliotecário' ? t.roleLibrarian : foundUser.role === 'blocked' ? t.roleBlocked : t.roleUser}
+                  </div>
+                </div>
+              </div>
+
+              {foundUser.role !== 'admin' && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">{t.updateRole}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <button
+                      onClick={() => handleUpdateRole('user')}
+                      disabled={isUpdating || foundUser.role === 'user'}
+                      className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                        foundUser.role === 'user'
+                          ? 'bg-primary/5 border-primary text-primary'
+                          : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      <User size={24} />
+                      <span className="font-bold text-sm">{t.roleUser}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleUpdateRole('bibliotecário')}
+                      disabled={isUpdating || foundUser.role === 'bibliotecário'}
+                      className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                        foundUser.role === 'bibliotecário'
+                          ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-600 dark:text-blue-400'
+                          : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      <ShieldCheck size={24} />
+                      <span className="font-bold text-sm">{t.roleLibrarian}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleUpdateRole('blocked')}
+                      disabled={isUpdating || foundUser.role === 'blocked'}
+                      className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                        foundUser.role === 'blocked'
+                          ? 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-600 dark:text-red-400'
+                          : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      <UserX size={24} />
+                      <span className="font-bold text-sm">{t.roleBlocked}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const BackofficeView = ({ 
   reservations, 
   users,
   onUpdateStatus,
   onManageRooms,
+  onManageUsers,
   lang
 }: { 
   reservations: Reservation[], 
   users: UserData[],
   onUpdateStatus: (id: string, status: string) => void,
   onManageRooms: () => void,
+  onManageUsers: () => void,
   lang: string
 }) => {
   const t = translations[lang as keyof typeof translations];
@@ -417,13 +621,22 @@ const BackofficeView = ({
             <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{t.backofficeTitle}</h1>
             <p className="text-slate-500 dark:text-slate-400 mt-1">{t.backofficeSubtitle}</p>
           </div>
-          <button 
-            onClick={onManageRooms}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm"
-          >
-            <Settings size={18} className="text-primary" />
-            {t.manageRooms}
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={onManageRooms}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm"
+            >
+              <Settings size={18} className="text-primary" />
+              {t.manageRooms}
+            </button>
+            <button 
+              onClick={onManageUsers}
+              className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm"
+            >
+              <Users size={18} className="text-primary" />
+              {t.manageUsers}
+            </button>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
@@ -1333,13 +1546,32 @@ export default function App() {
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice' | 'manage-rooms'>('map');
+  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice' | 'manage-rooms' | 'manage-users'>('map');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string>('101');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserSwitcher(false);
+      }
+    };
+
+    if (showUserSwitcher) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserSwitcher]);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -1745,7 +1977,7 @@ export default function App() {
       setCurrentUser(userData);
       setShowUserSwitcher(false);
       
-      if (userData.role === 'librarian' || userData.role === 'admin') {
+      if (userData.role === 'bibliotecário' || userData.role === 'admin') {
         setCurrentView('backoffice');
       } else {
         setCurrentView('map');
@@ -1856,7 +2088,7 @@ export default function App() {
             >
               {t.navSchedules}
             </button>
-            {(currentUser?.role === 'admin' || currentUser?.role === 'librarian') && (
+            {(currentUser?.role === 'admin' || currentUser?.role === 'bibliotecário') && (
               <button 
                 onClick={() => setCurrentView('backoffice')}
                 className={`text-sm font-semibold transition-colors ${currentView === 'backoffice' ? 'text-[#0066cc]' : 'text-slate-600 dark:text-slate-400 hover:text-[#0066cc]'}`}
@@ -1944,7 +2176,7 @@ export default function App() {
             <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
               <Bell className="h-5 w-5" />
             </button>
-            <div className="relative">
+            <div className="relative" ref={userMenuRef}>
               <button 
                 onClick={() => setShowUserSwitcher(!showUserSwitcher)}
                 className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
@@ -2035,7 +2267,7 @@ export default function App() {
                 active={currentView === 'reservations'} 
                 onClick={() => setCurrentView('reservations')}
               />
-              {(currentUser?.role === 'librarian' || currentUser?.role === 'admin') && (
+              {(currentUser?.role === 'bibliotecário' || currentUser?.role === 'admin') && (
                 <SidebarLink 
                   icon={<CheckCircle2 size={20} />} 
                   label={t.navBackoffice} 
@@ -2252,7 +2484,13 @@ export default function App() {
                 users={allUsers}
                 onUpdateStatus={handleUpdateReservationStatus}
                 onManageRooms={() => setCurrentView('manage-rooms')}
+                onManageUsers={() => setCurrentView('manage-users')}
                 lang={lang}
+              />
+            ) : currentView === 'manage-users' ? (
+              <ManageUsersView 
+                lang={lang} 
+                onBack={() => setCurrentView('backoffice')}
               />
             ) : (
               <ManageRoomsView 

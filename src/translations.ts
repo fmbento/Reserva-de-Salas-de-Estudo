@@ -38,6 +38,7 @@ export interface TranslationKeys {
   connectionError: string;
   restrictedDomain: string;
   enter: string;
+  search: string;
   resendCode: string;
   helpAccess: string;
   accountNotFound: string;
@@ -94,7 +95,20 @@ export interface TranslationKeys {
   reservationApprovedSuccess: string;
   reservationRejectedSuccess: string;
   roomUpdatedSuccess: string;
+  userUpdatedSuccess: string;
   simulateUser: string;
+
+  // User Management
+  manageUsers: string;
+  manageUsersSubtitle: string;
+  searchUserPlaceholder: string;
+  userRole: string;
+  roleUser: string;
+  roleLibrarian: string;
+  roleBlocked: string;
+  updateRole: string;
+  userBlockedError: string;
+  noUserFound: string;
 
   // Room Details & Booking
   capacity: string;
@@ -255,6 +269,7 @@ export const translations: Record<Language, TranslationKeys> = {
     connectionError: "Erro de ligação ao servidor.",
     restrictedDomain: "Apenas emails @ua.pt são permitidos.",
     enter: "Entrar",
+    search: "Procurar",
     resendCode: "Não recebeu o código? Reenviar código",
     helpAccess: "Dificuldades no acesso?",
     accountNotFound: "Conta não encontrada. Por favor, registe-se primeiro.",
@@ -311,7 +326,20 @@ export const translations: Record<Language, TranslationKeys> = {
     reservationApprovedSuccess: "Reserva aprovada com sucesso.",
     reservationRejectedSuccess: "Reserva recusada com sucesso.",
     roomUpdatedSuccess: "Sala atualizada com sucesso.",
+    userUpdatedSuccess: "Utilizador atualizado com sucesso.",
     simulateUser: "Simular Utilizador",
+
+    // User Management
+    manageUsers: "Gerir Utilizadores",
+    manageUsersSubtitle: "Pesquise utilizadores e altere as suas permissões ou bloqueie o acesso.",
+    searchUserPlaceholder: "Pesquisar por email...",
+    userRole: "Cargo / Estatuto",
+    roleUser: "Utilizador (User)",
+    roleLibrarian: "Bibliotecário",
+    roleBlocked: "Bloqueado",
+    updateRole: "Atualizar Estatuto",
+    userBlockedError: "A sua conta está bloqueada. Contacte o administrador.",
+    noUserFound: "Nenhum utilizador encontrado com este email.",
 
     // Room Details & Booking
     capacity: "Capacidade",
@@ -470,6 +498,7 @@ export const translations: Record<Language, TranslationKeys> = {
     connectionError: "Error connecting to the server.",
     restrictedDomain: "Only @ua.pt emails are allowed.",
     enter: "Enter",
+    search: "Search",
     resendCode: "Didn't receive code? Resend code",
     helpAccess: "Having trouble accessing?",
     accountNotFound: "Account not found. Please register first.",
@@ -526,7 +555,20 @@ export const translations: Record<Language, TranslationKeys> = {
     reservationApprovedSuccess: "Reservation approved successfully.",
     reservationRejectedSuccess: "Reservation rejected successfully.",
     roomUpdatedSuccess: "Room updated successfully.",
+    userUpdatedSuccess: "User updated successfully.",
     simulateUser: "Simulate User",
+
+    // User Management
+    manageUsers: "Manage Users",
+    manageUsersSubtitle: "Search users and change their permissions or block access.",
+    searchUserPlaceholder: "Search by email...",
+    userRole: "Role / Status",
+    roleUser: "User",
+    roleLibrarian: "Librarian",
+    roleBlocked: "Blocked",
+    updateRole: "Update Status",
+    userBlockedError: "Your account is blocked. Contact the administrator.",
+    noUserFound: "No user found with this email.",
 
     // Room Details & Booking
     capacity: "Capacity",

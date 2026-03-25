@@ -97,7 +97,7 @@ const seedData = () => {
   const users = [
     { name: "Utilizador Teste 1", email: "teste01@ua.pt", role: "user" },
     { name: "Utilizador Teste 2", email: "teste02@ua.pt", role: "user" },
-    { name: "Bibliotecário 01", email: "bib01@ua.pt", role: "librarian" },
+    { name: "Bibliotecário 01", email: "bib01@ua.pt", role: "bibliotecário" },
     { name: "Administrador do Sistema 01", email: adminEmail, role: "admin" },
     { name: "Filipe Bento", email: "filben@gmail.com", role: "admin" },
   ];
@@ -386,6 +386,11 @@ async function startServer() {
 
     // Check if user exists for login
     const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    
+    if (user && user.role === 'blocked') {
+      return res.status(403).json({ error: t.userBlockedError });
+    }
+
     if (type === 'login' && !user) {
       return res.status(404).json({ error: t.accountNotFound });
     }
@@ -439,6 +444,11 @@ async function startServer() {
 
     // Valid OTP - Find or Create User
     let user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    
+    if (user && user.role === 'blocked') {
+      return res.status(403).json({ error: t.userBlockedError });
+    }
+
     let isNewUser = false;
 
     if (!user) {
@@ -606,6 +616,43 @@ async function startServer() {
     const users = db.prepare("SELECT * FROM users").all();
     console.log("Serving /api/users request. Count:", users.length);
     res.json(users);
+  });
+
+  app.get("/api/users/search", (req, res) => {
+    const { email, lang } = req.query;
+    const userLang = (lang as Language) || 'pt';
+    const t = translations[userLang];
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    if (!user) {
+      return res.status(404).json({ error: t.noUserFound });
+    }
+
+    res.json(user);
+  });
+
+  app.put("/api/users/:id/role", (req, res) => {
+    const { id } = req.params;
+    const { role, lang } = req.body;
+    const userLang = (lang as Language) || 'pt';
+    const t = translations[userLang];
+
+    if (!['user', 'bibliotecário', 'blocked'].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
+    try {
+      db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, id);
+      broadcast({ type: 'USERS_UPDATED' });
+      res.json({ success: true, message: t.userUpdatedSuccess });
+    } catch (error: any) {
+      console.error("[USERS] Error updating role:", error);
+      res.status(500).json({ error: t.internalServerError });
+    }
   });
 
   app.put("/api/rooms/:id", (req, res) => {

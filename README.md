@@ -167,7 +167,7 @@ CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
-  role TEXT DEFAULT 'user' -- 'user', 'librarian', 'admin'
+  role TEXT DEFAULT 'user' -- 'user', 'bibliotecário', 'admin', 'blocked'
 );
 ```
 
