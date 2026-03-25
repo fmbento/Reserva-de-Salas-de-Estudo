@@ -258,8 +258,13 @@ const Login = ({
           <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
         </div>
 
-        <div className="w-16 h-16 bg-[#0066cc] rounded-full flex items-center justify-center text-white font-bold text-2xl mb-6">
-          UA
+        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center overflow-hidden mb-6 shadow-sm border border-slate-100 dark:border-slate-800">
+          <img 
+            src="http://salina.web.ua.pt/ua.png" 
+            alt="UA Logo" 
+            className="w-10 h-10 object-contain"
+            referrerPolicy="no-referrer"
+          />
         </div>
         
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1 text-center">
@@ -2061,8 +2066,13 @@ export default function App() {
       <header className="flex h-16 items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 md:px-10 shrink-0 z-50">
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-2 text-[#0066cc]">
-            <div className="bg-[#0066cc] text-white p-1.5 rounded-lg">
-              <Building2 className="h-5 w-5 md:h-6 md:w-6" />
+            <div className="bg-white p-1 rounded-lg shadow-sm border border-slate-100 dark:border-slate-800">
+              <img 
+                src="http://salina.web.ua.pt/ua.png" 
+                alt="UA Logo" 
+                className="h-6 w-6 md:h-7 md:w-7 object-contain"
+                referrerPolicy="no-referrer"
+              />
             </div>
             <h2 className="text-base md:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
               <span className="hidden md:inline">{t.uaTitle}</span>
