@@ -9,6 +9,7 @@ import nodemailer from "nodemailer";
 import * as ics from 'ics';
 import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
+import { translations, Language } from "./src/translations";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -180,7 +181,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-function formatReservationTime(startTime: string, durationMinutes: number) {
+function formatReservationTime(startTime: string, durationMinutes: number, lang: Language = 'pt') {
   const [h, m] = startTime.split(':').map(Number);
   const startTotal = h * 60 + m;
   const endTotal = startTotal + durationMinutes;
@@ -199,24 +200,24 @@ function formatReservationTime(startTime: string, durationMinutes: number) {
     durationStr = `${dm}min`;
   }
   
-  return `${startTime} - ${endTime} (duração: ${durationStr})`;
+  return `${startTime} - ${endTime} (${translations[lang].duration}: ${durationStr})`;
 }
 
-async function sendWelcomeEmail(email: string, name: string) {
+async function sendWelcomeEmail(email: string, name: string, lang: Language = 'pt') {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const t = translations[lang];
   try {
     await transporter.sendMail({
       from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: "Bem-vindo ao SiReS Bibliotecas UA",
+      subject: t.emailWelcomeSubject,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
-          <p>Olá <strong>${name}</strong>,</p>
-          <p>A sua conta foi criada com sucesso na plataforma de reserva de salas da Universidade de Aveiro.</p>
-          <p>Agora já pode reservar salas de estudo e laboratórios de forma rápida e eficiente.</p>
+          <p>${translations[lang].hello} <strong>${name}</strong>,</p>
+          <p>${t.emailWelcomeBody}</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SiReS</p>
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
         </div>
       `,
     });
@@ -225,25 +226,25 @@ async function sendWelcomeEmail(email: string, name: string) {
   }
 }
 
-async function sendReservationPendingEmail(email: string, roomName: string, date: string, startTime: string, duration: number) {
+async function sendReservationPendingEmail(email: string, roomName: string, date: string, startTime: string, duration: number, lang: Language = 'pt') {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const t = translations[lang];
   try {
     await transporter.sendMail({
       from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: "Pedido de Reserva Recebido - SiReS Bibliotecas UA",
+      subject: t.emailReservationSubject,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
-          <p>O seu pedido de reserva foi recebido e está <strong>pendente de aprovação</strong>.</p>
+          <p>${t.emailReservationBody}</p>
           <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 5px 0;"><strong>Sala:</strong> ${roomName}</p>
-            <p style="margin: 5px 0;"><strong>Data:</strong> ${date}</p>
-            <p style="margin: 5px 0;"><strong>Hora:</strong> ${formatReservationTime(startTime, duration)}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailRoom}:</strong> ${roomName}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${date}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(startTime, duration, lang)}</p>
           </div>
-          <p>Receberá uma confirmação assim que o pedido for validado pelos serviços da biblioteca.</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SiReS</p>
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
         </div>
       `,
     });
@@ -252,11 +253,12 @@ async function sendReservationPendingEmail(email: string, roomName: string, date
   }
 }
 
-async function sendReservationStatusEmail(email: string, roomName: string, res: any, status: string) {
+async function sendReservationStatusEmail(email: string, roomName: string, res: any, status: string, lang: Language = 'pt') {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const t = translations[lang];
   
   const isConfirmed = status === 'Confirmed' || status === 'Occupied';
-  const subject = isConfirmed ? "Reserva CONFIRMADA - SiReS Bibliotecas UA" : "Reserva CANCELADA - SiReS Bibliotecas UA";
+  const subject = isConfirmed ? t.emailReservationSubject : `${t.emailReservationSubject} - ${lang === 'pt' ? 'CANCELADA' : 'CANCELLED'}`;
   
   let attachments: any[] = [];
   
@@ -293,16 +295,15 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2 style="color: ${isConfirmed ? '#10b981' : '#ef4444'}; text-align: center;">SiReS Bibliotecas UA</h2>
-          <p>A sua reserva para a sala <strong>${roomName}</strong> foi <strong>${isConfirmed ? 'CONFIRMADA' : 'CANCELADA'}</strong>.</p>
+          <p>${t.emailRoom} <strong>${roomName}</strong>: <strong>${isConfirmed ? (lang === 'pt' ? 'CONFIRMADA' : 'CONFIRMED') : (lang === 'pt' ? 'CANCELADA' : 'CANCELLED')}</strong>.</p>
           <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 5px 0;"><strong>Sala:</strong> ${roomName}</p>
-            <p style="margin: 5px 0;"><strong>Data:</strong> ${res.date}</p>
-            <p style="margin: 5px 0;"><strong>Hora:</strong> ${formatReservationTime(res.start_time, res.duration)}</p>
-            <p style="margin: 5px 0;"><strong>Estado:</strong> ${isConfirmed ? 'Confirmada' : 'Cancelada'}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailRoom}:</strong> ${roomName}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${res.date}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(res.start_time, res.duration, lang)}</p>
+            <p style="margin: 5px 0;"><strong>${lang === 'pt' ? 'Estado' : 'Status'}:</strong> ${isConfirmed ? (lang === 'pt' ? 'Confirmada' : 'Confirmed') : (lang === 'pt' ? 'Cancelada' : 'Cancelled')}</p>
           </div>
-          ${isConfirmed ? '<p>Enviamos em anexo o ficheiro para adicionar ao seu calendário.</p>' : '<p>Se tiver alguma dúvida, por favor contacte os serviços da biblioteca.</p>'}
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SiReS</p>
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
         </div>
       `,
     });
@@ -311,7 +312,7 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
   }
 }
 
-async function sendOtpEmail(email: string, code: string) {
+async function sendOtpEmail(email: string, code: string, lang: Language = 'pt') {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     const missing = [];
     if (!process.env.SMTP_USER) missing.push('SMTP_USER');
@@ -321,22 +322,24 @@ async function sendOtpEmail(email: string, code: string) {
     return;
   }
 
+  const t = translations[lang];
+
   try {
     await transporter.sendMail({
       from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: "Código de Acesso - SiReS Bibliotecas UA",
+      subject: t.emailOtpSubject,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
-          <p>Olá,</p>
-          <p>Utilize o seguinte código para aceder à plataforma de reserva de salas:</p>
+          <p>${translations[lang].hello},</p>
+          <p>${t.emailOtpBody}</p>
           <div style="background: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333; margin: 20px 0; border-radius: 8px;">
             ${code}
           </div>
-          <p style="color: #666; font-size: 14px;">Este código expira em 10 minutos. Se não solicitou este código, por favor ignore este e-mail.</p>
+          <p style="color: #666; font-size: 14px;">${translations[lang].codeExpires}</p>
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">Universidade de Aveiro - SiReS</p>
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
         </div>
       `,
     });
@@ -371,20 +374,23 @@ async function startServer() {
 
   // Auth Endpoints
   app.post("/api/auth/request-otp", async (req, res) => {
-    const { email, name, type } = req.body; // type: 'login' | 'register'
+    const { email, name, type, lang } = req.body; // type: 'login' | 'register'
     
     const adminEmail = process.env.ADMIN_EMAIL || "sbidm-biblioteca@ua.pt";
+    const userLang = (lang as Language) || 'pt';
+    const t = translations[userLang];
+
     if (!email.endsWith("@ua.pt") && email !== "filben@gmail.com" && email !== adminEmail) {
-      return res.status(400).json({ error: "Apenas e-mails oficiais da Universidade de Aveiro (@ua.pt) são permitidos." });
+      return res.status(400).json({ error: t.restrictedDomain });
     }
 
     // Check if user exists for login
     const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
     if (type === 'login' && !user) {
-      return res.status(404).json({ error: "Conta não encontrada. Por favor, registe-se primeiro." });
+      return res.status(404).json({ error: t.accountNotFound });
     }
     if (type === 'register' && user) {
-      return res.status(400).json({ error: "Este e-mail já está registado. Por favor, faça login." });
+      return res.status(400).json({ error: t.emailAlreadyRegistered });
     }
 
     const code = Math.floor(10000 + Math.random() * 90000).toString();
@@ -396,37 +402,39 @@ async function startServer() {
         VALUES (?, ?, ?, ?)
       `).run(email, code, name || null, expiresAt);
 
-      const emailSent = await sendOtpEmail(email, code);
+      const emailSent = await sendOtpEmail(email, code, userLang);
       res.json({ 
         success: true, 
         message: emailSent 
-          ? "Código enviado para o seu e-mail." 
-          : "Ocorreu um erro ao enviar o e-mail, mas o código foi gerado. Por favor, contacte o administrador ou verifique os logs." 
+          ? t.otpSentSuccess 
+          : t.otpSentError 
       });
     } catch (error: any) {
       console.error("[AUTH] Error in request-otp:", error);
       res.status(500).json({ 
-        error: "Erro ao processar o pedido de acesso.",
+        error: t.errorRequestOtp,
         details: process.env.NODE_ENV !== 'production' ? error.message : undefined
       });
     }
   });
 
   app.post("/api/auth/verify-otp", (req, res) => {
-    const { email, code } = req.body;
+    const { email, code, lang } = req.body;
+    const userLang = (lang as Language) || 'pt';
+    const t = translations[userLang];
 
     const otpRecord = db.prepare("SELECT * FROM otps WHERE email = ?").get(email);
 
     if (!otpRecord) {
-      return res.status(400).json({ error: "Código inválido ou expirado." });
+      return res.status(400).json({ error: t.invalidOtp });
     }
 
     if (otpRecord.code !== code) {
-      return res.status(400).json({ error: "Código incorreto." });
+      return res.status(400).json({ error: t.incorrectOtp });
     }
 
     if (new Date(otpRecord.expires_at) < new Date()) {
-      return res.status(400).json({ error: "Código expirado." });
+      return res.status(400).json({ error: t.expiredOtp });
     }
 
     // Valid OTP - Find or Create User
@@ -443,7 +451,7 @@ async function startServer() {
     db.prepare("DELETE FROM otps WHERE email = ?").run(email);
 
     if (isNewUser && user) {
-      sendWelcomeEmail(user.email, user.name).catch(console.error);
+      sendWelcomeEmail(user.email, user.name, lang).catch(console.error);
       broadcast({ type: 'USERS_UPDATED' });
     }
 
@@ -467,10 +475,12 @@ async function startServer() {
   });
 
   app.post("/api/reservations", (req, res) => {
-    const { room_id, user_id, date, start_time, duration, subject } = req.body;
+    const { room_id, user_id, date, start_time, duration, subject, lang } = req.body;
+    const userLang = (lang as Language) || 'pt';
+    const t = translations[userLang];
     
     if (!room_id || !date || !start_time || !duration) {
-      return res.status(400).json({ error: "Dados da reserva incompletos." });
+      return res.status(400).json({ error: t.incompleteBookingData });
     }
 
     // Ensure we have a valid user_id
@@ -481,20 +491,20 @@ async function startServer() {
       if (firstUser) {
         uid = firstUser.id;
       } else {
-        return res.status(401).json({ error: "Utilizador não identificado e nenhum utilizador encontrado na base de dados." });
+        return res.status(401).json({ error: t.userNotFoundInDb });
       }
     }
 
     // Verify user exists to avoid foreign key failure
     const userExists = db.prepare("SELECT id FROM users WHERE id = ?").get(uid);
     if (!userExists) {
-      return res.status(401).json({ error: "Utilizador não encontrado. Por favor, faça login novamente." });
+      return res.status(401).json({ error: t.userNotFoundLoginAgain });
     }
 
     // Verify room exists to avoid foreign key failure
     const roomExists = db.prepare("SELECT id FROM rooms WHERE id = ?").get(room_id);
     if (!roomExists) {
-      return res.status(404).json({ error: "Sala não encontrada." });
+      return res.status(404).json({ error: t.roomNotFound });
     }
     
     const parseTime = (t: string) => {
@@ -514,7 +524,7 @@ async function startServer() {
     });
 
     if (userConflict) {
-      return res.status(409).json({ error: "Já possui uma reserva ativa que se sobrepõe a este horário." });
+      return res.status(409).json({ error: t.overlappingReservationUser });
     }
 
     // 2. Check for ROOM conflicts
@@ -526,7 +536,7 @@ async function startServer() {
     });
 
     if (roomConflict) {
-      return res.status(409).json({ error: "Esta sala já está reservada para este horário." });
+      return res.status(409).json({ error: t.overlappingReservationRoom });
     }
 
     try {
@@ -541,7 +551,7 @@ async function startServer() {
       const user = db.prepare("SELECT email FROM users WHERE id = ?").get(uid) as { email: string };
       const room = db.prepare("SELECT name FROM rooms WHERE id = ?").get(room_id) as { name: string };
       if (user && room) {
-        sendReservationPendingEmail(user.email, room.name, date, start_time, duration).catch(console.error);
+        sendReservationPendingEmail(user.email, room.name, date, start_time, duration, lang).catch(console.error);
       }
 
       broadcast({ type: 'RESERVATIONS_UPDATED' });
@@ -549,7 +559,7 @@ async function startServer() {
     } catch (error: any) {
       console.error("Error creating reservation:", error);
       res.status(500).json({ 
-        error: "Erro ao processar a reserva na base de dados.",
+        error: t.errorBooking,
         details: error.message 
       });
     }
@@ -557,6 +567,7 @@ async function startServer() {
 
   app.delete("/api/reservations/:id", (req, res) => {
     const { id } = req.params;
+    const lang = (req.query.lang as Language) || 'pt';
     try {
       // Fetch details before deleting for notification
       const reservation = db.prepare(`
@@ -568,22 +579,25 @@ async function startServer() {
       `).get(id);
 
       if (reservation) {
-        sendReservationStatusEmail(reservation.user_email, reservation.room_name, reservation, 'Cancelled').catch(console.error);
+        sendReservationStatusEmail(reservation.user_email, reservation.room_name, reservation, 'Cancelled', lang).catch(console.error);
       }
 
       db.prepare("DELETE FROM reservations WHERE id = ?").run(id);
       broadcast({ type: 'RESERVATIONS_UPDATED' });
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ error: "Failed to delete reservation" });
+      const t = translations[lang];
+      res.status(500).json({ error: t.errorDeleteReservation });
     }
   });
 
   app.get("/api/user/me", (req, res) => {
     const email = req.query.email as string || "filben@gmail.com";
+    const lang = (req.query.lang as Language) || 'pt';
+    const t = translations[lang];
     const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: t.userNotFound });
     }
     res.json(user);
   });
@@ -613,17 +627,23 @@ async function startServer() {
         broadcast({ type: 'ROOMS_UPDATED' });
         res.json({ success: true });
       } else {
-        res.status(404).json({ error: "Room not found" });
+        const lang = (req.body.lang as Language) || 'pt';
+        const t = translations[lang];
+        res.status(404).json({ error: t.roomNotFound });
       }
     } catch (error) {
       console.error("Error updating room:", error);
-      res.status(500).json({ error: "Internal server error" });
+      const lang = (req.body.lang as Language) || 'pt';
+      const t = translations[lang];
+      res.status(500).json({ error: t.internalServerError });
     }
   });
 
   app.patch("/api/reservations/:id/status", (req, res) => {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, lang } = req.body;
+    const userLang = (lang as Language) || 'pt';
+    const t = translations[userLang];
     try {
       db.prepare("UPDATE reservations SET status = ? WHERE id = ?").run(status, id);
       
@@ -637,13 +657,13 @@ async function startServer() {
       `).get(id);
 
       if (reservation) {
-        sendReservationStatusEmail(reservation.user_email, reservation.room_name, reservation, status).catch(console.error);
+        sendReservationStatusEmail(reservation.user_email, reservation.room_name, reservation, status, userLang).catch(console.error);
       }
 
       broadcast({ type: 'RESERVATIONS_UPDATED' });
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to update status" });
+      res.status(500).json({ error: t.errorUpdateStatus });
     }
   });
 

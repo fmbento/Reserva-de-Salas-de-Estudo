@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building2, 
   Search, 
@@ -34,17 +34,23 @@ import {
   Check,
   RotateCcw,
   Upload,
-  ArrowRight
+  ArrowRight,
+  Sun,
+  Moon,
+  Globe
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import Cookies from 'js-cookie';
+import { translations, Language } from './translations';
 
 type RoomStatus = 'Available' | 'Pending' | 'Occupied';
 type OperationalStatus = 'Active' | 'Maintenance' | 'Inactive';
 
-const AVAILABLE_AMENITIES = [
+
+const getAvailableAmenities = (t: any) => [
   { id: 'Eduroam', icon: <Wifi size={14} />, label: 'Eduroam' },
   { id: 'Tomadas', icon: <Plug size={14} />, label: 'Tomadas' },
-  { id: 'Smart Screen', icon: <Monitor size={14} />, label: 'Ecrã Inteligente' },
+  { id: 'Smart Screen', icon: <Monitor size={14} />, label: t.smartScreen },
   { id: 'Projetor', icon: <Projector size={14} />, label: 'Projetor' },
   { id: 'Ar Condicionado', icon: <Wind size={14} />, label: 'Ar Condicionado' },
   { id: 'Smart TV', icon: <Monitor size={14} />, label: 'Smart TV' },
@@ -82,7 +88,40 @@ interface UserData {
   role: 'user' | 'librarian' | 'admin';
 }
 
-const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void }) => {
+const ThemeToggle = ({ theme, toggleTheme }: { theme: 'light' | 'dark', toggleTheme: () => void }) => (
+  <button
+    onClick={toggleTheme}
+    className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400"
+    title={theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+  >
+    {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+  </button>
+);
+
+const LanguageToggle = ({ lang, setLang }: { lang: Language, setLang: (l: Language) => void }) => (
+  <button
+    onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}
+    className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-xs font-bold text-slate-600 dark:text-slate-400"
+  >
+    <Globe size={14} />
+    {lang.toUpperCase()}
+  </button>
+);
+
+const Login = ({ 
+  onLoginSuccess, 
+  lang, 
+  setLang, 
+  theme, 
+  toggleTheme 
+}: { 
+  onLoginSuccess: (user: UserData) => void,
+  lang: Language,
+  setLang: (l: Language) => void,
+  theme: 'light' | 'dark',
+  toggleTheme: () => void
+}) => {
+  const t = translations[lang];
   const [step, setStep] = useState<'request' | 'verify'>('request');
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -94,7 +133,7 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.endsWith('@ua.pt') && email !== 'filben@gmail.com') {
-      setError('Apenas e-mails oficiais da Universidade de Aveiro (@ua.pt) são permitidos.');
+      setError(t.invalidEmail);
       return;
     }
     setLoading(true);
@@ -103,16 +142,21 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
       const res = await fetch('/api/auth/request-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name: mode === 'register' ? name : undefined, type: mode }),
+        body: JSON.stringify({ 
+          email, 
+          name: mode === 'register' ? name : undefined, 
+          type: mode,
+          lang // Pass language to backend for emails
+        }),
       });
       const data = await res.json();
       if (res.ok) {
         setStep('verify');
       } else {
-        setError(data.error || 'Erro ao solicitar código.');
+        setError(data.error || t.connectionError);
       }
     } catch (err) {
-      setError('Erro de conexão.');
+      setError(t.connectionError);
     } finally {
       setLoading(false);
     }
@@ -122,7 +166,7 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
     if (e) e.preventDefault();
     const code = otp.join('');
     if (code.length < 5) {
-      setError('Por favor, insira o código de 5 dígitos.');
+      setError(t.enterOtp);
       return;
     }
     setLoading(true);
@@ -131,16 +175,16 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code, lang }),
       });
       const data = await res.json();
       if (res.ok) {
         onLoginSuccess(data);
       } else {
-        setError(data.error || 'Código incorreto.');
+        setError(data.error || t.incorrectOtpFrontend);
       }
     } catch (err) {
-      setError('Erro de conexão.');
+      setError(t.connectionError);
     } finally {
       setLoading(false);
     }
@@ -200,28 +244,34 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4 font-sans transition-colors">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 flex flex-col items-center"
+        className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 flex flex-col items-center relative"
       >
+        {/* Header Toggles */}
+        <div className="absolute top-6 right-6 flex items-center gap-2">
+          <LanguageToggle lang={lang} setLang={setLang} />
+          <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+        </div>
+
         <div className="w-16 h-16 bg-[#0066cc] rounded-full flex items-center justify-center text-white font-bold text-2xl mb-6">
           UA
         </div>
         
-        <h1 className="text-2xl font-bold text-slate-900 mb-1 text-center">
-          <span className="hidden md:inline">SiReS - Reserva de Salas das Bibliotecas UA</span>
-          <span className="md:hidden">SiReS Bibliotecas UA</span>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1 text-center">
+          <span className="hidden md:inline">{t.loginTitle}</span>
+          <span className="md:hidden">{t.loginTitleMobile}</span>
         </h1>
-        <p className="text-slate-500 text-sm mb-8 text-center">
+        <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 text-center">
           {step === 'request' 
-            ? (mode === 'login' ? 'Inicie sessão com o seu e-mail da UA' : 'Crie a sua conta da UA')
-            : 'Verifique o seu e-mail. Introduza o código de 5 dígitos enviado para o seu e-mail da UA.'}
+            ? (mode === 'login' ? t.loginSubtitle : t.registerSubtitle)
+            : t.verifySubtitle}
         </p>
 
         {error && (
-          <div className="w-full mb-6 p-3 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm flex items-center gap-2">
+          <div className="w-full mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
             <AlertCircle size={16} />
             {error}
           </div>
@@ -231,37 +281,37 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
           <form onSubmit={handleRequestOtp} className="w-full space-y-6">
             {mode === 'register' && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Nome Completo</label>
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.nameLabel}</label>
                 <input 
                   type="text" 
-                  placeholder="Seu nome aqui"
+                  placeholder={t.namePlaceholder}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0066cc] focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0066cc] focus:border-transparent transition-all"
                 />
               </div>
             )}
             
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">E-mail da UA</label>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.emailLabel}</label>
               <input 
                 type="email" 
                 placeholder="utilizador@ua.pt"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#0066cc] focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0066cc] focus:border-transparent transition-all"
               />
-              <p className="text-xs text-slate-400">Apenas e-mails oficiais da Universidade de Aveiro.</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">{t.restrictedDomain}</p>
             </div>
 
             <button 
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+              className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-70"
             >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : 'Receber Código por E-mail'}
+              {loading ? <Loader2 className="animate-spin" size={20} /> : t.receiveOtp}
             </button>
 
             <div className="text-center">
@@ -273,12 +323,12 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
                 }}
                 className="text-sm text-[#0066cc] font-bold hover:underline"
               >
-                {mode === 'login' ? 'Ainda não tem conta? Registe-se' : 'Já tem conta? Inicie sessão'}
+                {mode === 'login' ? t.noAccount : t.hasAccount}
               </button>
             </div>
             
-            <div className="pt-4 border-t border-slate-100 text-center">
-              <p className="text-xs font-bold text-slate-300 tracking-widest uppercase">Restrito a domínios @ua.pt</p>
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
+              <p className="text-xs font-bold text-slate-300 dark:text-slate-600 tracking-widest uppercase">{t.restrictedDomain}</p>
             </div>
           </form>
         ) : (
@@ -296,7 +346,7 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
                   onChange={(e) => handleOtpChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
                   onPaste={handlePaste}
-                  className="w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 border-slate-200 focus:border-[#0066cc] focus:outline-none transition-all"
+                  className="w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:border-[#0066cc] focus:outline-none transition-all"
                 />
               ))}
             </div>
@@ -304,29 +354,35 @@ const Login = ({ onLoginSuccess }: { onLoginSuccess: (user: UserData) => void })
             <button 
               onClick={() => handleVerifyOtp()}
               disabled={loading || otp.join('').length < 5}
-              className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+              className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-70"
             >
               {loading ? <Loader2 className="animate-spin" size={20} /> : (
                 <>
-                  Entrar <ArrowRight size={20} />
+                  {t.enter} <ArrowRight size={20} />
                 </>
               )}
             </button>
 
             <div className="text-center">
-              <p className="text-sm text-slate-500">
-                Não recebeu o código? <button onClick={handleRequestOtp} className="text-[#0066cc] font-bold hover:underline">Reenviar</button>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {t.resendCode.includes('?') ? (
+                  <>
+                    {t.resendCode.split('?')[0]}? <button onClick={handleRequestOtp} className="text-[#0066cc] font-bold hover:underline">{t.resendCode.split('?')[1].trim()}</button>
+                  </>
+                ) : (
+                  <button onClick={handleRequestOtp} className="text-[#0066cc] font-bold hover:underline">{t.resendCode}</button>
+                )}
               </p>
             </div>
 
-            <div className="pt-4 border-t border-slate-100 text-center">
-              <p className="text-xs font-bold text-slate-300 tracking-widest uppercase">Universidade de Aveiro</p>
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
+              <p className="text-xs font-bold text-slate-300 dark:text-slate-600 tracking-widest uppercase">{t.uaTitle}</p>
             </div>
           </div>
         )}
       </motion.div>
       
-      <p className="mt-8 text-slate-500 text-sm">Precisa de ajuda com o acesso?</p>
+      <p className="mt-8 text-slate-500 dark:text-slate-400 text-sm">{t.helpAccess}</p>
     </div>
   );
 };
@@ -335,81 +391,82 @@ const BackofficeView = ({
   reservations, 
   users,
   onUpdateStatus,
-  onManageRooms
+  onManageRooms,
+  lang
 }: { 
   reservations: Reservation[], 
   users: UserData[],
   onUpdateStatus: (id: string, status: string) => void,
-  onManageRooms: () => void
+  onManageRooms: () => void,
+  lang: string
 }) => {
+  const t = translations[lang as keyof typeof translations];
   const now = new Date();
   
   const futureReservations = reservations.filter(res => {
     const resDateTime = new Date(`${res.date}T${res.startTime}`);
-    // We consider it "future" if it starts after now or is today
-    // To be precise, let's say it hasn't started yet or started recently
     return resDateTime >= now || res.date === now.toISOString().split('T')[0];
   }).sort((a, b) => new Date(`${a.date}T${a.startTime}`).getTime() - new Date(`${b.date}T${b.startTime}`).getTime());
 
   return (
-    <div className="flex-1 overflow-auto p-6 md:p-10">
+    <div className="flex-1 overflow-auto p-6 md:p-10 bg-slate-50 dark:bg-slate-950 transition-colors">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Gestão de Reservas</h1>
-            <p className="text-slate-500 mt-1">Aprovação e monitorização de pedidos de salas (Apenas futuras).</p>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{t.backofficeTitle}</h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">{t.backofficeSubtitle}</p>
           </div>
           <button 
             onClick={onManageRooms}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm"
           >
             <Settings size={18} className="text-primary" />
-            Gestão de Salas
+            {t.manageRooms}
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Sala</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Utilizador</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Data / Hora</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Assunto</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Ações</th>
+              <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.room}</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.user}</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.dateTime}</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.subject}</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.status}</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">{t.actions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {futureReservations.map((res) => {
                 const user = users.find(u => u.id === res.userId);
                 return (
-                  <tr key={res.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={res.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900">{res.roomName}</div>
-                      <div className="text-xs text-slate-500">ID: {res.roomId}</div>
+                      <div className="font-medium text-slate-900 dark:text-white">{res.roomName}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">ID: {res.roomId}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900">{user?.name || 'Utilizador Desconhecido'}</div>
-                      <div className="text-xs text-slate-500">{user?.email || 'N/A'}</div>
+                      <div className="font-medium text-slate-900 dark:text-white">{user?.name || (lang === 'pt' ? 'Utilizador Desconhecido' : 'Unknown User')}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{user?.email || 'N/A'}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
+                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
                       <div>{res.date}</div>
-                      <div className="text-xs text-slate-400">{res.startTime} ({res.duration})</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500">{res.startTime} ({res.duration})</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600">
-                      {res.subject || 'Sem assunto'}
+                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
+                      {res.subject || (lang === 'pt' ? 'Sem assunto' : 'No subject')}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        res.status === 'Pending' ? 'bg-amber-100 text-amber-800' :
-                        res.status === 'Confirmed' || res.status === 'Occupied' ? 'bg-emerald-100 text-emerald-800' :
-                        'bg-slate-100 text-slate-800'
+                        res.status === 'Pending' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
+                        res.status === 'Confirmed' || res.status === 'Occupied' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                        'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400'
                       }`}>
-                        {res.status === 'Pending' ? 'Pendente' : 
-                         res.status === 'Confirmed' ? 'Confirmada' :
-                         res.status === 'Occupied' ? 'Ocupada' :
-                         res.status === 'Cancelled' ? 'Cancelada' : res.status}
+                        {res.status === 'Pending' ? t.statusPending : 
+                         res.status === 'Confirmed' ? t.statusConfirmed :
+                         res.status === 'Occupied' ? t.statusOccupied :
+                         res.status === 'Cancelled' ? t.statusCancelled : res.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
@@ -417,15 +474,15 @@ const BackofficeView = ({
                         <>
                           <button 
                             onClick={() => onUpdateStatus(res.id, 'Confirmed')}
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Aprovar"
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
+                            title={t.approve}
                           >
                             <CheckCircle2 className="h-5 w-5" />
                           </button>
                           <button 
                             onClick={() => onUpdateStatus(res.id, 'Cancelled')}
-                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                            title="Recusar"
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
+                            title={t.reject}
                           >
                             <X className="h-5 w-5" />
                           </button>
@@ -437,8 +494,8 @@ const BackofficeView = ({
               })}
               {futureReservations.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                    Não existem reservas futuras registadas.
+                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
+                    {t.noFutureReservations}
                   </td>
                 </tr>
               )}
@@ -453,12 +510,15 @@ const BackofficeView = ({
 const ManageRoomsView = ({ 
   rooms, 
   onUpdateRoom,
-  onBack
+  onBack,
+  lang
 }: { 
   rooms: Room[], 
   onUpdateRoom: (id: string, data: Partial<Room>) => Promise<void>,
-  onBack: () => void
+  onBack: () => void,
+  lang: string
 }) => {
+  const t = translations[lang as keyof typeof translations];
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(rooms[0]?.id || null);
   const [filter, setFilter] = useState<'All' | 'Active' | 'Maintenance'>('All');
   
@@ -512,41 +572,41 @@ const ManageRoomsView = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50/50 dark:bg-slate-950 transition-colors">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 p-6 md:p-8 shrink-0">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 p-6 md:p-8 shrink-0 transition-colors">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <button 
               onClick={onBack}
-              className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500 dark:text-slate-400"
             >
               <ChevronLeft size={24} />
             </button>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900">Gestão de Salas</h1>
-              <p className="text-slate-500 mt-1">Controlo em tempo real sobre os espaços de aprendizagem.</p>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{t.manageRooms}</h1>
+              <p className="text-slate-500 dark:text-slate-400 mt-1">{t.manageRoomsSubtitle}</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl transition-colors">
             <button 
               onClick={() => setFilter('All')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'All' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'All' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-              Todas
+              {t.all}
             </button>
             <button 
               onClick={() => setFilter('Active')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Active' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Active' ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-              Ativas
+              {t.active}
             </button>
             <button 
               onClick={() => setFilter('Maintenance')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Maintenance' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Maintenance' ? 'bg-white dark:bg-slate-700 text-amber-600 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-              Manutenção
+              {t.maintenance}
             </button>
           </div>
         </div>
@@ -555,52 +615,52 @@ const ManageRoomsView = ({
       <div className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full">
         {/* Room List */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Nome da Sala</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Departamento</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Estado</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Capacidade</th>
+                <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.roomName}</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.department}</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.status}</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.capacity}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredRooms.map((room) => (
                   <tr 
                     key={room.id} 
                     onClick={() => setSelectedRoomId(room.id)}
-                    className={`cursor-pointer transition-colors ${selectedRoomId === room.id ? 'bg-primary/5' : 'hover:bg-slate-50'}`}
+                    className={`cursor-pointer transition-colors ${selectedRoomId === room.id ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                   >
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${
-                          room.operationalStatus === 'Active' ? 'bg-emerald-100 text-emerald-600' :
-                          room.operationalStatus === 'Maintenance' ? 'bg-amber-100 text-amber-600' :
-                          'bg-slate-100 text-slate-400'
+                          room.operationalStatus === 'Active' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                          room.operationalStatus === 'Maintenance' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
+                          'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                         }`}>
                           <Building2 size={20} />
                         </div>
-                        <span className="font-bold text-slate-900">{room.name}</span>
+                        <span className="font-bold text-slate-900 dark:text-white">{room.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-sm text-slate-500">{room.department}</td>
+                    <td className="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">{room.department}</td>
                     <td className="px-6 py-5">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        room.operationalStatus === 'Active' ? 'bg-emerald-100 text-emerald-600' :
-                        room.operationalStatus === 'Maintenance' ? 'bg-amber-100 text-amber-600' :
-                        'bg-slate-100 text-slate-500'
+                        room.operationalStatus === 'Active' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                        room.operationalStatus === 'Maintenance' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
+                        'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                       }`}>
                         <div className={`h-1.5 w-1.5 rounded-full ${
                           room.operationalStatus === 'Active' ? 'bg-emerald-500' :
                           room.operationalStatus === 'Maintenance' ? 'bg-amber-500' :
                           'bg-slate-400'
                         }`} />
-                        {room.operationalStatus === 'Active' ? 'Ativa' : 
-                         room.operationalStatus === 'Maintenance' ? 'Manutenção' : 'Inativa'}
+                        {room.operationalStatus === 'Active' ? t.active : 
+                         room.operationalStatus === 'Maintenance' ? t.maintenance : t.inactive}
                       </span>
                     </td>
-                    <td className="px-6 py-5 text-sm font-medium text-slate-700">{room.capacity} pax</td>
+                    <td className="px-6 py-5 text-sm font-medium text-slate-700 dark:text-slate-300">{room.capacity} {t.pax}</td>
                   </tr>
                 ))}
               </tbody>
@@ -609,18 +669,18 @@ const ManageRoomsView = ({
         </div>
 
         {/* Edit Panel */}
-        <div className="w-full md:w-96 bg-white border-l border-slate-200 overflow-y-auto p-8">
+        <div className="w-full md:w-96 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 overflow-y-auto p-8 transition-colors">
           {selectedRoom ? (
             <div className="space-y-8">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Editar Detalhes</h2>
-                <p className="text-sm text-slate-500">A editar "{selectedRoom.name}"</p>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t.editDetails}</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{t.editing} "{selectedRoom.name}"</p>
               </div>
 
               {/* Image Section */}
               <div className="space-y-3">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Imagem da Sala</label>
-                <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 border-2 border-dashed border-slate-200 group">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.roomImage}</label>
+                <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 group transition-colors">
                   {editImage ? (
                     <>
                       <img src={editImage} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -634,17 +694,17 @@ const ManageRoomsView = ({
                       </div>
                     </>
                   ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
                       <Upload size={32} className="mb-2" />
-                      <span className="text-xs font-medium">Upload de Foto</span>
+                      <span className="text-xs font-medium">{t.uploadPhoto}</span>
                     </div>
                   )}
                   <input 
                     type="text" 
-                    placeholder="URL da Imagem..."
+                    placeholder={t.imageUrlPlaceholder}
                     value={editImage}
                     onChange={(e) => setEditImage(e.target.value)}
-                    className="absolute bottom-2 left-2 right-2 bg-white/90 backdrop-blur-sm border-none rounded-lg text-[10px] px-2 py-1 focus:ring-0"
+                    className="absolute bottom-2 left-2 right-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-none rounded-lg text-[10px] px-2 py-1 focus:ring-0 text-slate-900 dark:text-white"
                   />
                 </div>
               </div>
@@ -652,33 +712,33 @@ const ManageRoomsView = ({
               {/* Form Fields */}
               <div className="space-y-5">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Nome da Sala</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.roomName}</label>
                   <input 
                     type="text" 
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded-xl border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                    className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Departamento</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.department}</label>
                   <select 
                     value={editDept}
                     onChange={(e) => setEditDept(e.target.value)}
-                    className="w-full rounded-xl border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                    className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
                   >
                     <option value="Departamento de Engenharia">Departamento de Engenharia</option>
-                    <option value="Departamento de Informática">Departamento de Informática</option>
+                    <option value="Departamento de Informática">{t.deptInformatics}</option>
                     <option value="Departamento de Artes">Departamento de Artes</option>
                     <option value="Biblioteca Geral">Biblioteca Geral</option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Capacidade (pax)</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.capacity} ({t.pax})</label>
                   <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
                       <Users size={18} />
                     </div>
                     <input 
@@ -686,7 +746,7 @@ const ManageRoomsView = ({
                       inputMode="numeric"
                       value={editCapacity}
                       onChange={(e) => setEditCapacity(parseInt(e.target.value))}
-                      className="w-full pl-11 rounded-xl border-slate-200 bg-slate-50 text-sm font-bold focus:border-primary focus:ring-primary"
+                      className="w-full pl-11 rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm font-bold focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
                     />
                   </div>
                 </div>
@@ -694,7 +754,7 @@ const ManageRoomsView = ({
 
               {/* Amenities */}
               <div className="space-y-3">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Comodidades</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.amenities}</label>
                 <div className="flex flex-wrap gap-2">
                   {AVAILABLE_AMENITIES.map((amenity) => (
                     <button
@@ -703,7 +763,7 @@ const ManageRoomsView = ({
                       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
                         editAmenities.includes(amenity.id)
                           ? 'bg-primary/10 border-primary text-primary'
-                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
                       {amenity.icon}
@@ -711,31 +771,31 @@ const ManageRoomsView = ({
                       {editAmenities.includes(amenity.id) && <Check size={12} />}
                     </button>
                   ))}
-                  <button className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-50 border border-slate-200 text-slate-400 hover:bg-slate-100 transition-all">
+                  <button className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all">
                     <Plus size={12} />
-                    Adicionar
+                    {t.add}
                   </button>
                 </div>
               </div>
 
               {/* Status Control */}
               <div className="space-y-3">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Controlo de Estado</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.statusControl}</label>
                 <div className="space-y-2">
                   <button 
                     onClick={() => setEditStatus('Active')}
                     className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
                       editStatus === 'Active' 
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-900' 
-                        : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-500 text-emerald-900 dark:text-emerald-400' 
+                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <CheckCircle2 size={20} className={editStatus === 'Active' ? 'text-emerald-600' : 'text-slate-300'} />
-                      <span className="text-sm font-bold">Ativar Sala</span>
+                      <CheckCircle2 size={20} className={editStatus === 'Active' ? 'text-emerald-600' : 'text-slate-300 dark:text-slate-700'} />
+                      <span className="text-sm font-bold">{t.activateRoom}</span>
                     </div>
                     <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
-                      editStatus === 'Active' ? 'border-emerald-600' : 'border-slate-200'
+                      editStatus === 'Active' ? 'border-emerald-600' : 'border-slate-200 dark:border-slate-800'
                     }`}>
                       {editStatus === 'Active' && <div className="h-2.5 w-2.5 rounded-full bg-emerald-600" />}
                     </div>
@@ -745,16 +805,16 @@ const ManageRoomsView = ({
                     onClick={() => setEditStatus('Maintenance')}
                     className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
                       editStatus === 'Maintenance' 
-                        ? 'bg-amber-50 border-amber-500 text-amber-900' 
-                        : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-500 text-amber-900 dark:text-amber-400' 
+                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Settings size={20} className={editStatus === 'Maintenance' ? 'text-amber-600' : 'text-slate-300'} />
-                      <span className="text-sm font-bold">Manutenção</span>
+                      <Settings size={20} className={editStatus === 'Maintenance' ? 'text-amber-600' : 'text-slate-300 dark:text-slate-700'} />
+                      <span className="text-sm font-bold">{t.maintenanceMode}</span>
                     </div>
                     <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
-                      editStatus === 'Maintenance' ? 'border-amber-600' : 'border-slate-200'
+                      editStatus === 'Maintenance' ? 'border-amber-600' : 'border-slate-200 dark:border-slate-800'
                     }`}>
                       {editStatus === 'Maintenance' && <div className="h-2.5 w-2.5 rounded-full bg-amber-600" />}
                     </div>
@@ -764,16 +824,16 @@ const ManageRoomsView = ({
                     onClick={() => setEditStatus('Inactive')}
                     className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
                       editStatus === 'Inactive' 
-                        ? 'bg-slate-50 border-slate-500 text-slate-900' 
-                        : 'bg-white border-slate-100 text-slate-500 hover:border-slate-200'
+                        ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-500 dark:border-slate-400 text-slate-900 dark:text-white' 
+                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-slate-200 dark:hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <X size={20} className={editStatus === 'Inactive' ? 'text-slate-600' : 'text-slate-300'} />
-                      <span className="text-sm font-bold">Desativar</span>
+                      <X size={20} className={editStatus === 'Inactive' ? 'text-slate-600' : 'text-slate-300 dark:text-slate-700'} />
+                      <span className="text-sm font-bold">{t.deactivateRoom}</span>
                     </div>
                     <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center ${
-                      editStatus === 'Inactive' ? 'border-slate-600' : 'border-slate-200'
+                      editStatus === 'Inactive' ? 'border-slate-600' : 'border-slate-200 dark:border-slate-800'
                     }`}>
                       {editStatus === 'Inactive' && <div className="h-2.5 w-2.5 rounded-full bg-slate-600" />}
                     </div>
@@ -786,26 +846,26 @@ const ManageRoomsView = ({
                 <button 
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="flex-1 bg-primary text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 bg-primary text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {isSaving ? <Loader2 size={18} className="animate-spin" /> : 'Guardar Alterações'}
+                  {isSaving ? <Loader2 size={18} className="animate-spin" /> : t.save}
                 </button>
                 <button 
                   onClick={() => setSelectedRoomId(null)}
-                  className="px-6 border border-slate-200 text-slate-600 py-3.5 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all"
+                  className="px-6 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 py-3.5 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                 >
-                  Cancelar
+                  {t.cancel}
                 </button>
               </div>
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
-              <div className="h-20 w-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300">
+              <div className="h-20 w-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-300 dark:text-slate-700">
                 <ImageIcon size={40} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Nenhuma sala selecionada</h3>
-                <p className="text-sm text-slate-500 max-w-[200px] mx-auto">Selecione uma sala na lista para editar os seus detalhes.</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{lang === 'pt' ? 'Nenhuma sala selecionada' : 'No room selected'}</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-[200px] mx-auto">{lang === 'pt' ? 'Selecione uma sala na lista para editar os seus detalhes.' : 'Select a room from the list to edit its details.'}</p>
               </div>
             </div>
           )}
@@ -823,7 +883,8 @@ const SchedulesView = ({
   setBookingDate, 
   setBookingStartTime,
   setBookingDuration,
-  onNewBooking
+  onNewBooking,
+  lang
 }: { 
   rooms: Room[], 
   reservations: Reservation[],
@@ -832,8 +893,10 @@ const SchedulesView = ({
   setBookingDate: (date: string) => void,
   setBookingStartTime: (time: string) => void,
   setBookingDuration: (duration: string) => void,
-  onNewBooking: () => void
+  onNewBooking: () => void,
+  lang: string
 }) => {
+  const t = translations[lang as keyof typeof translations];
   const [currentDate, setCurrentDate] = useState(new Date());
   const [roomSearch, setRoomSearch] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -849,7 +912,7 @@ const SchedulesView = ({
     setIsDragging(false);
   }, [selectedRoomId, currentDate]);
 
-  const days = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'];
+  const days = lang === 'pt' ? ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'] : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   const hours = Array.from({ length: 11 }, (_, i) => `${(i + 8).toString().padStart(2, '0')}:00`);
 
   const filteredRooms = rooms.filter(r => 
@@ -919,10 +982,10 @@ const SchedulesView = ({
       const m = durationMins % 60;
       
       if (h > 0) {
-        durationStr += `${h} Hora${h > 1 ? 's' : ''}`;
-        if (m > 0) durationStr += ` e ${m}`;
+        durationStr += `${h} ${h > 1 ? t.hoursLabel : t.hourLabel}`;
+        if (m > 0) durationStr += ` ${t.andLabel} ${m}`;
       } else {
-        durationStr = `${m} Minutos`;
+        durationStr = `${m} ${t.minutesLabel}`;
       }
       
       const d = new Date(currentDate);
@@ -931,8 +994,7 @@ const SchedulesView = ({
       setBookingStartTime(startTimeStr);
       setBookingDuration(durationStr);
     }
-    setIsDragging(false);
-    // We no longer clear dragStart/dragEnd here to keep the selection visible
+    setIsDragging(true); // Keep selection visible
   };
 
   const isSlotSelected = (dayIndex: number, hourStr: string, minute: number) => {
@@ -1000,7 +1062,7 @@ const SchedulesView = ({
         startTotal,
         duration: durationMins,
         status: res.status === 'Pending' ? 'Pending' : 'Occupied',
-        title: res.subject || 'Reserva'
+        title: res.subject || t.reservation
       };
     })
     .filter(item => item.day >= 0 && item.day < 7);
@@ -1010,7 +1072,7 @@ const SchedulesView = ({
     start.setDate(start.getDate() - (start.getDay() === 0 ? 6 : start.getDay() - 1));
     const end = new Date(start);
     end.setDate(end.getDate() + 6);
-    return `${start.toLocaleDateString('pt-PT')} - ${end.toLocaleDateString('pt-PT')}`;
+    return `${start.toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-US')} - ${end.toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-US')}`;
   };
 
   return (
@@ -1018,21 +1080,21 @@ const SchedulesView = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="flex-1 flex flex-col overflow-hidden p-6 md:p-10"
+      className="flex-1 flex flex-col overflow-hidden p-6 md:p-10 bg-slate-50 dark:bg-slate-950 transition-colors"
     >
       <div className="max-w-6xl mx-auto w-full flex flex-col h-full">
         <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Horários das Salas</h2>
-            <p className="text-slate-500">Visualize a ocupação semanal e planeie as suas reservas.</p>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{t.navSchedules}</h2>
+            <p className="text-slate-500 dark:text-slate-400">{t.schedulesSubtitle}</p>
           </div>
           
           <button 
             onClick={onNewBooking}
-            className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+            className="flex items-center gap-2 px-6 py-3 bg-[#0066cc] text-white rounded-xl font-bold shadow-lg shadow-[#0066cc]/20 hover:bg-[#0052a3] transition-all"
           >
             <Plus size={20} />
-            Nova Reserva
+            {t.newReservation}
           </button>
         </div>
 
@@ -1041,7 +1103,7 @@ const SchedulesView = ({
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div className="flex flex-col sm:flex-row gap-6">
               <div className="flex flex-col gap-2 relative">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pesquisar / Selecionar Sala</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t.searchSelectRoom}</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Search size={14} className="text-slate-400" />
@@ -1092,7 +1154,7 @@ const SchedulesView = ({
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Semana de Visualização</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t.viewWeek}</label>
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => {
@@ -1125,15 +1187,15 @@ const SchedulesView = ({
             <div className="flex items-center gap-4 pt-4 lg:pt-0 border-t lg:border-t-0 border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded-full bg-emerald-500" />
-                <span className="text-xs font-medium text-slate-600">Livre</span>
+                <span className="text-xs font-medium text-slate-600">{t.statusAvailable}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded-full bg-amber-500" />
-                <span className="text-xs font-medium text-slate-600">Pendente</span>
+                <span className="text-xs font-medium text-slate-600">{t.statusPending}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded-full bg-rose-500" />
-                <span className="text-xs font-medium text-slate-600">Ocupado</span>
+                <span className="text-xs font-medium text-slate-600">{t.statusOccupied}</span>
               </div>
             </div>
           </div>
@@ -1240,6 +1302,34 @@ const SchedulesView = ({
 };
 
 export default function App() {
+  const [lang, setLang] = useState<Language>(() => {
+    const saved = Cookies.get('sirs_lang');
+    return (saved === 'pt' || saved === 'en') ? saved as Language : 'pt';
+  });
+
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = Cookies.get('sirs_theme');
+    return (saved === 'light' || saved === 'dark') ? saved as 'light' | 'dark' : 'light';
+  });
+
+  const t = translations[lang];
+  const AVAILABLE_AMENITIES = getAvailableAmenities(t);
+
+  useEffect(() => {
+    Cookies.set('sirs_lang', lang, { expires: 365 });
+  }, [lang]);
+
+  useEffect(() => {
+    Cookies.set('sirs_theme', theme, { expires: 365 });
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice' | 'manage-rooms'>('map');
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -1422,12 +1512,12 @@ export default function App() {
     
     if (bDate < now) {
       setBookingStatus('error');
-      setBookingMessage('Não é possível reservar para uma data ou hora anterior à atual.');
+      setBookingMessage(t.pastBookingError);
       return;
     }
 
     setBookingStatus('checking');
-    setBookingMessage('A verificar disponibilidade em tempo real...');
+    setBookingMessage(t.checkingAvailability);
 
     const currentRoom = rooms.find(r => r.id === selectedRoomId);
     if (!currentRoom) return;
@@ -1527,7 +1617,7 @@ export default function App() {
 
         // Fallback: Strict refusal if no adjustment possible or total overlap
         setBookingStatus('error');
-        setBookingMessage('Já possui uma reserva ativa que se sobrepõe a este horário. Se desejar manter esta nova marcação, deverá primeiro apagar a(s) outra(s) reserva(s) que fez antes para parte do tempo que agora estava a marcar, e voltar a inserir a reserva pretendida.');
+        setBookingMessage(t.overlapUserLongError);
         return;
       }
     }
@@ -1572,7 +1662,8 @@ export default function App() {
           date: bookingDate,
           start_time: activeStartTime,
           duration: durationMins,
-          subject: bookingSubject
+          subject: bookingSubject,
+          lang // Pass language to backend for emails
         })
       });
 
@@ -1581,15 +1672,15 @@ export default function App() {
         if (response.status === 401) {
           handleLogout();
           setBookingStatus('error');
-          setBookingMessage('A sua sessão expirou ou o utilizador não foi encontrado. Por favor, faça login novamente.');
+          setBookingMessage(t.sessionExpiredError);
           return;
         }
         if (response.status === 409) {
           setBookingStatus('error');
-          setBookingMessage(errorData.error || 'Conflito de horário.');
+          setBookingMessage(errorData.error || t.timeConflict);
           return;
         }
-        throw new Error(errorData.error || errorData.details || "Erro ao criar reserva");
+        throw new Error(errorData.error || errorData.details || t.errorCreatingBooking);
       }
 
       const newRes = await response.json();
@@ -1611,7 +1702,7 @@ export default function App() {
 
       setReservations(mappedReservations);
       setBookingStatus('success');
-      setBookingMessage('Reserva efetuada com sucesso! O seu pedido está pendente de aprovação.');
+      setBookingMessage(t.bookingSuccess);
       
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error: any) {
@@ -1629,7 +1720,7 @@ export default function App() {
     if (!reservationToDelete) return;
     
     try {
-      const response = await fetch(`/api/reservations/${reservationToDelete}`, {
+      const response = await fetch(`/api/reservations/${reservationToDelete}?lang=${lang}`, {
         method: 'DELETE'
       });
 
@@ -1638,7 +1729,7 @@ export default function App() {
       setReservations(prev => prev.filter(res => res.id !== reservationToDelete));
       setReservationToDelete(null);
       setBookingStatus('success');
-      setBookingMessage('Reserva eliminada com sucesso.');
+      setBookingMessage(t.reservationDeletedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error) {
       console.error("Delete failed:", error);
@@ -1667,14 +1758,14 @@ export default function App() {
       const response = await fetch(`/api/reservations/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status, lang })
       });
 
       if (!response.ok) throw new Error("Failed to update status");
 
       setReservations(prev => prev.map(res => res.id === id ? { ...res, status: status as any } : res));
       setBookingStatus('success');
-      setBookingMessage(`Reserva ${status === 'Confirmed' ? 'aprovada' : 'recusada'} com sucesso.`);
+      setBookingMessage(status === 'Confirmed' ? t.reservationApprovedSuccess : t.reservationRejectedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error) {
       console.error("Update failed:", error);
@@ -1693,12 +1784,12 @@ export default function App() {
 
       setRooms(prev => prev.map(r => r.id === roomId ? { ...r, ...updatedData } : r));
       setBookingStatus('success');
-      setBookingMessage('Sala atualizada com sucesso.');
+      setBookingMessage(t.roomUpdatedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error) {
       console.error("Update failed:", error);
       setBookingStatus('error');
-      setBookingMessage('Erro ao atualizar a sala.');
+      setBookingMessage(t.errorUpdatingRoom);
     }
   };
 
@@ -1712,68 +1803,84 @@ export default function App() {
 
   const getStatusLabel = (status: RoomStatus) => {
     switch (status) {
-      case 'Available': return 'Disponível';
-      case 'Pending': return 'Pendente';
-      case 'Occupied': return 'Ocupada';
+      case 'Available': return t.statusAvailable;
+      case 'Pending': return t.statusPending;
+      case 'Occupied': return t.statusOccupied;
     }
   };
 
   if (!isLoggedIn) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <Login 
+        onLoginSuccess={handleLoginSuccess} 
+        lang={lang} 
+        setLang={setLang} 
+        theme={theme} 
+        toggleTheme={toggleTheme} 
+      />
+    );
   }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-background-light overflow-hidden">
+    <div className="flex h-screen w-full flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden transition-colors">
       {/* Header */}
-      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-10 shrink-0 z-50">
+      <header className="flex h-16 items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 md:px-10 shrink-0 z-50">
         <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2 text-primary">
-            <div className="bg-primary text-white p-1.5 rounded-lg">
+          <div className="flex items-center gap-2 text-[#0066cc]">
+            <div className="bg-[#0066cc] text-white p-1.5 rounded-lg">
               <Building2 className="h-5 w-5 md:h-6 md:w-6" />
             </div>
-            <h2 className="text-base md:text-lg font-bold tracking-tight text-slate-900">
-              <span className="hidden md:inline">SiReS - Reserva de Salas das Bibliotecas UA</span>
-              <span className="md:hidden">SiReS Bibliotecas UA</span>
+            <h2 className="text-base md:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+              <span className="hidden md:inline">{t.uaTitle}</span>
+              <span className="md:hidden">SiReS UA</span>
             </h2>
           </div>
           <nav className="hidden md:flex items-center gap-8">
             <button 
               onClick={() => setCurrentView('map')}
-              className={`text-sm font-semibold transition-colors ${currentView === 'map' ? 'text-primary' : 'text-slate-600 hover:text-primary'}`}
+              className={`text-sm font-semibold transition-colors ${currentView === 'map' ? 'text-[#0066cc]' : 'text-slate-600 dark:text-slate-400 hover:text-[#0066cc]'}`}
             >
-              Mapa
+              {t.navMap}
             </button>
             <button 
               onClick={() => setCurrentView('reservations')}
-              className={`text-sm font-semibold transition-colors ${currentView === 'reservations' ? 'text-primary' : 'text-slate-600 hover:text-primary'}`}
+              className={`text-sm font-semibold transition-colors ${currentView === 'reservations' ? 'text-[#0066cc]' : 'text-slate-600 dark:text-slate-400 hover:text-[#0066cc]'}`}
             >
-              As Minhas Reservas
+              {t.navMyReservations}
             </button>
             <button 
               onClick={() => setCurrentView('schedules')}
-              className={`text-sm font-semibold transition-colors ${currentView === 'schedules' ? 'text-primary' : 'text-slate-600 hover:text-primary'}`}
+              className={`text-sm font-semibold transition-colors ${currentView === 'schedules' ? 'text-[#0066cc]' : 'text-slate-600 dark:text-slate-400 hover:text-[#0066cc]'}`}
             >
-              Horários
+              {t.navSchedules}
             </button>
+            {(currentUser?.role === 'admin' || currentUser?.role === 'librarian') && (
+              <button 
+                onClick={() => setCurrentView('backoffice')}
+                className={`text-sm font-semibold transition-colors ${currentView === 'backoffice' ? 'text-[#0066cc]' : 'text-slate-600 dark:text-slate-400 hover:text-[#0066cc]'}`}
+              >
+                {t.navBackoffice}
+              </button>
+            )}
           </nav>
         </div>
         
-        <div className="flex items-center gap-2 md:gap-4">
-          <div className="relative hidden sm:block">
-            <div className="flex items-center bg-slate-100 rounded-lg px-3 h-10 w-64">
-              <Search className="h-5 w-5 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Pesquisar salas..." 
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowSearchResults(true);
-                }}
-                onFocus={() => setShowSearchResults(true)}
-                className="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-slate-400"
-              />
-            </div>
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="relative hidden sm:block">
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg px-3 h-10 w-64">
+                <Search className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                <input 
+                  type="text" 
+                  placeholder={t.searchPlaceholder} 
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowSearchResults(true);
+                  }}
+                  onFocus={() => setShowSearchResults(true)}
+                  className="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900 dark:text-white"
+                />
+              </div>
 
             {/* Search Results Dropdown */}
             <AnimatePresence>
@@ -1795,28 +1902,28 @@ export default function App() {
                             setShowSearchResults(false);
                             setCurrentView('map');
                           }}
-                          className="w-full flex items-start gap-3 p-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-100 last:border-0"
+                          className="w-full flex items-start gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left border-b border-slate-100 dark:border-slate-800 last:border-0"
                         >
                           <div className={`h-8 w-8 rounded-lg shrink-0 flex items-center justify-center ${
-                            room.status === 'Available' ? 'bg-emerald-100 text-emerald-600' :
-                            room.status === 'Pending' ? 'bg-amber-100 text-amber-600' :
-                            'bg-rose-100 text-rose-600'
+                            room.status === 'Available' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
+                            room.status === 'Pending' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+                            'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'
                           }`}>
                             <DoorOpen size={16} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-bold text-slate-900 truncate">{room.name}</p>
-                              <span className="text-[9px] font-bold text-slate-400 shrink-0">{room.capacity} pax</span>
+                              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{room.name}</p>
+                              <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 shrink-0">{room.capacity} pax</span>
                             </div>
-                            <p className="text-[10px] text-slate-500 truncate">{room.department}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{room.department}</p>
                           </div>
                         </button>
                       ))}
                     </div>
                   ) : (
                     <div className="p-4 text-center">
-                      <p className="text-sm text-slate-500">Nenhuma sala encontrada.</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{t.noRoomsFound}</p>
                     </div>
                   )}
                 </motion.div>
@@ -1824,14 +1931,21 @@ export default function App() {
             </AnimatePresence>
           </div>
           
+          <div className="flex items-center gap-2">
+            <LanguageToggle lang={lang} setLang={setLang} />
+            <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+          </div>
+
+          <div className="h-8 w-px bg-slate-200 dark:bg-slate-800 mx-1 hidden md:block"></div>
+
           <div className="flex gap-2">
-            <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+            <button className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
               <Bell className="h-5 w-5" />
             </button>
             <div className="relative">
               <button 
                 onClick={() => setShowUserSwitcher(!showUserSwitcher)}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
               >
                 <User className="h-5 w-5" />
               </button>
@@ -1842,22 +1956,22 @@ export default function App() {
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-[100]"
+                    className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-2 z-[100]"
                   >
-                    <div className="px-4 py-2 border-b border-slate-100 mb-1">
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Conta</p>
+                    <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
+                      <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{t.account}</p>
                     </div>
-                    <div className="px-4 py-3 mb-2 bg-slate-50 border-b border-slate-100">
-                      <p className="text-sm font-bold text-slate-900">{currentUser?.name}</p>
-                      <p className="text-xs text-slate-500">{currentUser?.email}</p>
-                      <span className="inline-block mt-1.5 px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold uppercase">
+                    <div className="px-4 py-3 mb-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">{currentUser?.name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{currentUser?.email}</p>
+                      <span className="inline-block mt-1.5 px-2 py-0.5 bg-[#0066cc]/10 text-[#0066cc] rounded text-[10px] font-bold uppercase">
                         {currentUser?.role}
                       </span>
                     </div>
 
                     {currentUser?.role === 'admin' && (
-                      <div className="px-4 py-2 border-b border-slate-100 mb-1">
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Simular Utilizador</p>
+                      <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
+                        <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{t.simulateUser}</p>
                       </div>
                     )}
                     
@@ -1865,22 +1979,22 @@ export default function App() {
                       <button
                         key={u.id}
                         onClick={() => handleSwitchUser(u.email)}
-                        className={`w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors flex flex-col ${currentUser?.id === u.id ? 'bg-primary/5' : ''}`}
+                        className={`w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex flex-col ${currentUser?.id === u.id ? 'bg-[#0066cc]/5' : ''}`}
                       >
-                        <span className={`text-sm font-medium ${currentUser?.id === u.id ? 'text-primary' : 'text-slate-700'}`}>
+                        <span className={`text-sm font-medium ${currentUser?.id === u.id ? 'text-[#0066cc]' : 'text-slate-700 dark:text-slate-300'}`}>
                           {u.name}
                         </span>
-                        <span className="text-xs text-slate-400">{u.email}</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500">{u.email}</span>
                       </button>
                     ))}
 
-                    <div className="mt-1 pt-1 border-t border-slate-100">
+                    <div className="mt-1 pt-1 border-t border-slate-100 dark:border-slate-800">
                       <button 
                         onClick={handleLogout}
-                        className="w-full text-left px-4 py-3 hover:bg-rose-50 text-rose-600 transition-colors flex items-center gap-2 text-sm font-bold"
+                        className="w-full text-left px-4 py-3 hover:bg-rose-50 dark:hover:bg-rose-900/20 text-rose-600 transition-colors flex items-center gap-2 text-sm font-bold"
                       >
                         <RotateCcw size={16} />
-                        Terminar Sessão
+                        {t.logout}
                       </button>
                     </div>
                   </motion.div>
@@ -1893,48 +2007,48 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="hidden md:flex w-64 flex-col justify-between border-r border-slate-200 bg-white p-4 shrink-0">
+        <aside className="hidden md:flex w-64 flex-col justify-between border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shrink-0 transition-colors">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col">
-              <h1 className="text-base font-semibold text-slate-900">Universidade de Aveiro</h1>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mt-1">SISTEMA DE SALAS DE ESTUDO</p>
+              <h1 className="text-base font-semibold text-slate-900 dark:text-white">{t.uaTitle}</h1>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mt-1">{t.systemTitle}</p>
             </div>
             
             <div className="flex flex-col gap-1">
               <SidebarLink 
                 icon={<MapIcon size={20} />} 
-                label="Mapa Interativo" 
+                label={t.navMap} 
                 active={currentView === 'map'} 
                 onClick={() => setCurrentView('map')}
               />
               <SidebarLink 
                 icon={<Calendar size={20} />} 
-                label="Horários" 
+                label={t.navSchedules} 
                 active={currentView === 'schedules'} 
                 onClick={() => setCurrentView('schedules')}
               />
               <SidebarLink 
                 icon={<CalendarCheck size={20} />} 
-                label="As Minhas Reservas" 
+                label={t.navMyReservations} 
                 active={currentView === 'reservations'} 
                 onClick={() => setCurrentView('reservations')}
               />
               {(currentUser?.role === 'librarian' || currentUser?.role === 'admin') && (
                 <SidebarLink 
                   icon={<CheckCircle2 size={20} />} 
-                  label="Backoffice" 
+                  label={t.navBackoffice} 
                   active={currentView === 'backoffice'} 
                   onClick={() => setCurrentView('backoffice')}
                 />
               )}
-              <SidebarLink icon={<Library size={20} />} label="Info. Biblioteca" />
-              <SidebarLink icon={<Settings size={20} />} label="Definições" />
+              <SidebarLink icon={<Library size={20} />} label={t.libraryInfo} />
+              <SidebarLink icon={<Settings size={20} />} label={t.settings} />
             </div>
           </div>
         </aside>
 
         {/* Main Content Area */}
-        <main className="relative flex-1 bg-slate-50 overflow-hidden flex flex-col">
+        <main className="relative flex-1 bg-slate-50 dark:bg-slate-950 overflow-hidden flex flex-col transition-colors">
           <AnimatePresence mode="wait">
             {currentView === 'map' ? (
               <motion.div 
@@ -1946,33 +2060,33 @@ export default function App() {
               >
                 {/* Mobile Search Bar */}
                 <div className="md:hidden p-4 bg-transparent absolute top-0 left-0 right-0 z-30">
-                  <div className="flex items-center bg-white rounded-xl px-4 h-12 shadow-lg border border-slate-100 cursor-pointer"
+                  <div className="flex items-center bg-white dark:bg-slate-900 rounded-xl px-4 h-12 shadow-lg border border-slate-100 dark:border-slate-800 cursor-pointer"
                     onClick={() => setCurrentView('map')}
                   >
-                    <Search className="h-5 w-5 text-slate-400 mr-2" />
+                    <Search className="h-5 w-5 text-slate-400 dark:text-slate-500 mr-2" />
                     <input 
                       type="text" 
-                      placeholder="Pesquisar salas ou edifícios" 
-                      className="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-slate-400"
+                      placeholder={t.searchPlaceholder} 
+                      className="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900 dark:text-white"
                     />
-                    <Filter className="h-5 w-5 text-primary ml-2" />
+                    <Filter className="h-5 w-5 text-[#0066cc] ml-2" />
                   </div>
                 </div>
 
                 {/* Legend / Filters */}
                 <div className="absolute top-20 md:top-4 left-4 z-10 flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-                  <div className="flex gap-2 rounded-xl border border-white bg-white/90 p-1 shadow-lg backdrop-blur">
-                    <LegendItem color="bg-emerald-500" label="DISPONÍVEL" />
-                    <LegendItem color="bg-amber-500" label="PENDENTE" />
-                    <LegendItem color="bg-rose-500" label="OCUPADA" />
+                  <div className="flex gap-2 rounded-xl border border-white dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-1 shadow-lg backdrop-blur">
+                    <LegendItem color="bg-emerald-500" label={t.statusAvailable.toUpperCase()} />
+                    <LegendItem color="bg-amber-500" label={t.statusPending.toUpperCase()} />
+                    <LegendItem color="bg-rose-500" label={t.statusOccupied.toUpperCase()} />
                   </div>
                 </div>
 
                 {/* Map Container */}
-                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12 bg-[#94b395] cursor-default"
+                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors"
                 >
                   <div 
-                    className="relative aspect-[9/16] md:aspect-[16/9] h-full md:w-full max-w-5xl rounded-2xl border border-slate-200 bg-white/20 shadow-2xl overflow-hidden"
+                    className="relative aspect-[9/16] md:aspect-[16/9] h-full md:w-full max-w-5xl rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden"
                     style={{ 
                       transform: `scale(${mapScale})`,
                       transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -2031,6 +2145,7 @@ export default function App() {
                 setBookingStartTime={setBookingStartTime}
                 setBookingDuration={setBookingDuration}
                 onNewBooking={() => setCurrentView('map')}
+                lang={lang}
               />
             ) : currentView === 'reservations' ? (
               <motion.div 
@@ -2038,12 +2153,12 @@ export default function App() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="flex-1 overflow-y-auto p-6 md:p-10"
+                className="flex-1 overflow-y-auto p-6 md:p-10 bg-slate-50 dark:bg-slate-950 transition-colors"
               >
                 <div className="max-w-4xl mx-auto">
                   <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-slate-900">As Minhas Reservas</h2>
-                    <p className="text-slate-500">Consulte e gira as suas reservas de salas de estudo.</p>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{t.navMyReservations}</h2>
+                    <p className="text-slate-500 dark:text-slate-400">{t.reservationsSubtitle}</p>
                   </div>
 
                   {reservations.filter(r => r.userId === currentUser?.id).length > 0 ? (
@@ -2084,11 +2199,11 @@ export default function App() {
                               <div className="space-y-4">
                                 <div className="flex items-center gap-2 mb-4">
                                   <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Reservas Ativas</h3>
+                                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t.activeReservations}</h3>
                                 </div>
                                 <div className="space-y-4">
                                   {active.map((res) => (
-                                    <ReservationCard key={res.id} res={res} onDelete={handleDeleteReservation} />
+                                    <ReservationCard key={res.id} res={res} onDelete={handleDeleteReservation} lang={lang} />
                                   ))}
                                 </div>
                               </div>
@@ -2098,12 +2213,12 @@ export default function App() {
                             {completed.length > 0 && (
                               <div className="space-y-4">
                                 <div className="flex items-center gap-2 mb-4">
-                                  <div className="h-2 w-2 rounded-full bg-slate-300" />
-                                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">Reservas Concluídas</h3>
+                                  <div className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-700" />
+                                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{t.completedReservations}</h3>
                                 </div>
                                 <div className="space-y-4 opacity-80">
                                   {completed.map((res) => (
-                                    <ReservationCard key={res.id} res={res} onDelete={handleDeleteReservation} />
+                                    <ReservationCard key={res.id} res={res} onDelete={handleDeleteReservation} lang={lang} />
                                   ))}
                                 </div>
                               </div>
@@ -2113,17 +2228,17 @@ export default function App() {
                       })()}
                     </div>
                   ) : (
-                    <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
-                      <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                    <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 transition-colors">
+                      <div className="h-16 w-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300 dark:text-slate-700">
                         <CalendarCheck size={32} />
                       </div>
-                      <h3 className="text-lg font-bold text-slate-900">Sem reservas</h3>
-                      <p className="text-slate-500">Ainda não efetuou nenhuma reserva de sala.</p>
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t.noReservations}</h3>
+                      <p className="text-slate-500 dark:text-slate-400">{t.noReservationsSubtitle}</p>
                       <button 
                         onClick={() => setCurrentView('map')}
-                        className="mt-6 px-6 py-2 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 transition-colors"
+                        className="mt-6 px-6 py-2 bg-[#0066cc] text-white rounded-xl font-bold text-sm hover:bg-[#0052a3] transition-colors"
                       >
-                        Reservar Agora
+                        {t.bookNow}
                       </button>
                     </div>
                   )}
@@ -2135,12 +2250,14 @@ export default function App() {
                 users={allUsers}
                 onUpdateStatus={handleUpdateReservationStatus}
                 onManageRooms={() => setCurrentView('manage-rooms')}
+                lang={lang}
               />
             ) : (
               <ManageRoomsView 
                 rooms={rooms}
                 onUpdateRoom={handleUpdateRoom}
                 onBack={() => setCurrentView('backoffice')}
+                lang={lang}
               />
             )}
           </AnimatePresence>
@@ -2150,7 +2267,7 @@ export default function App() {
         {(currentView === 'map' || currentView === 'schedules') && selectedRoom && (
           <>
             {/* Desktop Sidebar */}
-            <aside className="hidden md:flex w-80 flex-col border-l border-slate-200 bg-white overflow-y-auto shrink-0">
+            <aside className="hidden md:flex w-80 flex-col border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto shrink-0 transition-colors">
               <AnimatePresence mode="wait">
                 <motion.div 
                   key={selectedRoom.id}
@@ -2163,24 +2280,24 @@ export default function App() {
                   <div className="mb-6 flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-xl font-bold text-slate-900">{selectedRoom.name}</h3>
-                        <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">{selectedRoom.name}</h3>
+                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0">
                           {selectedRoom.capacity} pax
                         </span>
                       </div>
-                      <p className="text-sm text-slate-500">{selectedRoom.department}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{selectedRoom.department}</p>
                     </div>
                     <span className={`rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                      getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Available' ? 'bg-emerald-100 text-emerald-600' :
-                      getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Pending' ? 'bg-amber-100 text-amber-600' :
-                      'bg-rose-100 text-rose-600'
+                      getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Available' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
+                      getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) === 'Pending' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+                      'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'
                     }`}>
                       {getStatusLabel(getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime))}
                     </span>
                   </div>
 
                   <div className="space-y-6">
-                    <div className="aspect-video overflow-hidden rounded-xl bg-slate-100">
+                    <div className="aspect-video overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-800">
                       <img 
                         src={selectedRoom.image} 
                         alt={selectedRoom.name} 
@@ -2190,7 +2307,7 @@ export default function App() {
                     </div>
 
                     <div>
-                      <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">Comodidades</h4>
+                      <h4 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.amenities}</h4>
                       <div className="grid grid-cols-2 gap-3">
                         <Amenity icon={<Users size={16} />} label={`${selectedRoom.capacity} pax`} />
                         {AVAILABLE_AMENITIES.filter(a => selectedRoom.amenities.includes(a.id)).map(amenity => (
@@ -2199,45 +2316,45 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="border-t border-slate-100 pt-4">
-                      <h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">Reservar este espaço</h4>
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
+                      <h4 className="mb-4 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.bookThisSpace}</h4>
                       {selectedRoom.operationalStatus !== 'Active' ? (
-                        <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-sm font-medium flex items-center gap-3">
+                        <div className="p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-900/30 rounded-xl text-rose-700 dark:text-rose-400 text-sm font-medium flex items-center gap-3">
                           <AlertCircle size={20} />
                           {selectedRoom.operationalStatus === 'Maintenance' 
-                            ? 'Esta sala encontra-se em manutenção e não pode ser reservada.' 
-                            : 'Esta sala encontra-se inativa.'}
+                            ? t.roomMaintenance 
+                            : t.roomInactive}
                         </div>
                       ) : (
                         <div className="space-y-4">
                           <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">Assunto / Porquê</label>
+                            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.subjectLabel}</label>
                             <input 
                               type="text" 
-                              placeholder="Ex: Estudo de Grupo, Reunião..."
+                              placeholder={t.subjectPlaceholder}
                               value={bookingSubject}
                               onChange={(e) => setBookingSubject(e.target.value)}
-                              className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                              className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
                             />
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600">Selecionar Data</label>
+                            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.selectDate}</label>
                             <input 
                               type="date" 
                               value={bookingDate}
                               onChange={(e) => setBookingDate(e.target.value)}
-                              className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                              className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
                             />
                           </div>
                           
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600">Hora de Início</label>
+                              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.startTime}</label>
                               <select 
                                 value={bookingStartTime}
                                 onChange={(e) => setBookingStartTime(e.target.value)}
-                                className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                                className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
                               >
                                 {Array.from({ length: 40 }, (_, i) => {
                                   const h = Math.floor(i / 4) + 8;
@@ -2248,7 +2365,7 @@ export default function App() {
                               </select>
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600">Duração</label>
+                              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.duration}</label>
                               <select 
                                 value={bookingDuration}
                                 onChange={(e) => setBookingDuration(e.target.value)}
@@ -2305,10 +2422,10 @@ export default function App() {
                             {bookingStatus === 'checking' ? (
                               <>
                                 <Loader2 size={18} className="animate-spin" />
-                                A verificar...
+                                {t.checking}
                               </>
                             ) : (
-                              'Confirmar Reserva'
+                              t.confirmBooking
                             )}
                           </button>
                         </div>
@@ -2369,7 +2486,7 @@ export default function App() {
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Assunto / Porquê</label>
                           <input 
                             type="text" 
-                            placeholder="Ex: Estudo de Grupo, Reunião..."
+                            placeholder={t.subjectPlaceholder}
                             value={bookingSubject}
                             onChange={(e) => setBookingSubject(e.target.value)}
                             className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-primary focus:ring-primary"
@@ -2417,7 +2534,7 @@ export default function App() {
                         </div>
 
                         <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Duração</label>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.durationLabel}</label>
                           <select 
                             value={bookingDuration}
                             onChange={(e) => setBookingDuration(e.target.value)}
@@ -2471,11 +2588,11 @@ export default function App() {
                         {bookingStatus === 'checking' ? (
                           <>
                             <Loader2 size={20} className="animate-spin" />
-                            A verificar...
+                            {t.checking}
                           </>
                         ) : (
                           <>
-                            Confirmar Reserva <ArrowRight size={20} />
+                            {t.confirmBooking} <ArrowRight size={20} />
                           </>
                         )}
                       </button>
@@ -2513,7 +2630,7 @@ export default function App() {
             className={`flex flex-col items-center gap-1 text-slate-400`}
           >
             <Settings size={24} />
-            <span className="text-[10px] font-bold">Definições</span>
+            <span className="text-[10px] font-bold">{t.settings}</span>
           </button>
         </nav>
 
@@ -2571,22 +2688,25 @@ export default function App() {
                 <div className="h-16 w-16 bg-amber-100 rounded-2xl flex items-center justify-center mb-6">
                   <Clock size={32} className="text-amber-600" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-2">Conflito de Horário</h3>
+                <h3 className="text-2xl font-bold text-slate-900 mb-2">{t.conflictModalTitle}</h3>
                 <p className="text-slate-600 mb-6">
                   {conflictModal.type === 'room' ? (
                     <>
-                      Esta sala só está disponível até às <span className="font-bold text-slate-900">{conflictModal.availableUntil}</span> devido a outra reserva. 
-                      Deseja aceitar a reserva com a duração reduzida para <span className="font-bold text-slate-900">{conflictModal.newDuration} minutos</span>?
+                      {t.roomAvailableUntil.replace('{time}', conflictModal.availableUntil)} 
+                      <br />
+                      {t.acceptReducedDuration.replace('{duration}', conflictModal.newDuration.toString())}
                     </>
                   ) : conflictModal.type === 'user_start' ? (
                     <>
-                      Já possui outra reserva que termina às <span className="font-bold text-slate-900">{conflictModal.availableFrom}</span>. 
-                      Deseja alterar a hora de início para as <span className="font-bold text-slate-900">{conflictModal.newStartTime}</span>?
+                      {t.userReservationEndsAt.replace('{time}', conflictModal.availableFrom)} 
+                      <br />
+                      {t.changeStartTimeTo.replace('{time}', conflictModal.newStartTime)}
                     </>
                   ) : (
                     <>
-                      Já possui outra reserva que começa às <span className="font-bold text-slate-900">{conflictModal.availableUntil}</span>. 
-                      Deseja reduzir a duração desta reserva para <span className="font-bold text-slate-900">{conflictModal.newDuration} minutos</span>?
+                      {t.userReservationStartsAt.replace('{time}', conflictModal.availableUntil)} 
+                      <br />
+                      {t.reduceDurationTo.replace('{duration}', conflictModal.newDuration.toString())}
                     </>
                   )}
                 </p>
@@ -2599,13 +2719,13 @@ export default function App() {
                     }}
                     className="w-full py-3.5 rounded-xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20"
                   >
-                    Sim, aceitar alteração
+                    {t.yesAcceptChange}
                   </button>
                   <button 
                     onClick={() => setConflictModal({ ...conflictModal, isOpen: false })}
                     className="w-full py-3.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
                   >
-                    Não, cancelar pedido
+                    {t.noCancelRequest}
                   </button>
                 </div>
               </motion.div>
@@ -2634,23 +2754,23 @@ export default function App() {
                   <div className="h-12 w-12 rounded-full bg-rose-50 flex items-center justify-center">
                     <AlertCircle size={28} />
                   </div>
-                  <h3 className="text-lg font-bold">Confirmar Eliminação</h3>
+                  <h3 className="text-lg font-bold">{t.confirmDeletion}</h3>
                 </div>
                 <p className="text-slate-600 text-sm mb-6">
-                  Tem a certeza que deseja eliminar esta reserva? Esta ação não pode ser revertida.
+                  {t.confirmDeletionText}
                 </p>
                 <div className="flex gap-3">
                   <button 
                     onClick={() => setReservationToDelete(null)}
                     className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
                   >
-                    Cancelar
+                    {t.cancel}
                   </button>
                   <button 
                     onClick={confirmDelete}
                     className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20"
                   >
-                    Eliminar
+                    {t.delete}
                   </button>
                 </div>
               </motion.div>
@@ -2677,7 +2797,7 @@ function SidebarLink({
     <button 
       onClick={onClick}
       className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors text-left ${
-        active ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100'
+        active ? 'bg-[#0066cc]/10 text-[#0066cc]' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
       }`}
     >
       {icon}
@@ -2688,7 +2808,7 @@ function SidebarLink({
 
 function LegendItem({ color, label }: { color: string, label: string }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600">
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400">
       <span className={`h-3 w-3 rounded-full ${color}`} />
       <span className="text-xs font-semibold">{label}</span>
     </div>
@@ -2725,49 +2845,53 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMark
 
 function Amenity({ icon, label }: { icon: React.ReactNode, label: string, key?: string | number }) {
   return (
-    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100 text-slate-600 transition-all hover:bg-white hover:shadow-sm">
-      <div className="text-primary shrink-0">{icon}</div>
+    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-slate-600 dark:text-slate-400 transition-all hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm">
+      <div className="text-[#0066cc] shrink-0">{icon}</div>
       <span className="text-[11px] font-bold truncate">{label}</span>
     </div>
   );
 }
 
-function ReservationCard({ res, onDelete }: { res: Reservation, onDelete: (id: string, e: React.MouseEvent) => void, key?: string | number }) {
+function ReservationCard({ res, onDelete, lang }: { res: Reservation, onDelete: (id: string, e: React.MouseEvent) => void, lang: string, key?: string | number }) {
+  const t = translations[lang as keyof typeof translations];
+  
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-all">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+          <div className="h-12 w-12 rounded-xl bg-[#0066cc]/10 flex items-center justify-center text-[#0066cc]">
             <CalendarCheck size={24} />
           </div>
           <div>
-            <h4 className="font-bold text-slate-900">{res.roomName}</h4>
+            <h4 className="font-bold text-slate-900 dark:text-white">{res.roomName}</h4>
             {res.subject && (
-              <p className="text-xs text-slate-600 font-medium italic mb-1">"{res.subject}"</p>
+              <p className="text-xs text-slate-600 dark:text-slate-400 font-medium italic mb-1">"{res.subject}"</p>
             )}
-            <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
+            <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400 mt-1">
               <span className="flex items-center gap-1"><Clock size={14} /> {res.startTime}</span>
               <span className="flex items-center gap-1"><Users size={14} /> {res.duration}</span>
               <span>•</span>
-              <span>{new Date(res.date).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              <span>{new Date(res.date).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-            res.status === 'Pending' ? 'bg-amber-100 text-amber-600' :
-            res.status === 'Confirmed' || res.status === 'Occupied' ? 'bg-emerald-100 text-emerald-600' :
-            res.status === 'Completed' ? 'bg-slate-100 text-slate-600' :
-            'bg-rose-100 text-rose-600'
+            res.status === 'Pending' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+            res.status === 'Confirmed' || res.status === 'Occupied' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
+            res.status === 'Completed' ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400' :
+            'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'
           }`}>
-            {res.status === 'Pending' ? 'Pendente' : (res.status === 'Confirmed' || res.status === 'Occupied') ? 'Confirmada' : res.status === 'Completed' ? 'Concluída' : 'Cancelada'}
+            {res.status === 'Pending' ? t.statusPending : 
+             (res.status === 'Confirmed' || res.status === 'Occupied') ? t.statusConfirmed : 
+             res.status === 'Completed' ? t.statusCompleted : t.statusCancelled}
           </span>
           
           {(res.status === 'Pending' || res.status === 'Confirmed' || res.status === 'Occupied') && (
             <button 
               onClick={(e) => onDelete(res.id, e)}
-              className="p-2 text-slate-400 hover:text-rose-500 transition-colors relative z-30"
-              title="Eliminar reserva"
+              className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors relative z-30"
+              title={t.deleteReservation}
             >
               <Trash2 size={18} />
             </button>
