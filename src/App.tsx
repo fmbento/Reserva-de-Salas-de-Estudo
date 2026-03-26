@@ -2468,10 +2468,10 @@ export default function App() {
                 </div>
 
                 {/* Map Container */}
-                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-12 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors"
+                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-8 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors"
                 >
                   <div 
-                    className="relative aspect-[9/16] md:aspect-[16/9] h-full md:w-full max-w-5xl rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden"
+                    className="relative aspect-square h-full max-h-full max-w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden"
                     style={{ 
                       transform: `scale(${mapScale})`,
                       transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
@@ -2485,7 +2485,7 @@ export default function App() {
                       <img 
                         src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
                         alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
-                        className="w-full h-full object-contain opacity-80 dark:opacity-60 transition-opacity duration-500"
+                        className="w-full h-full object-cover opacity-80 dark:opacity-60 transition-opacity duration-500"
                         referrerPolicy="no-referrer"
                       />
                     </div>
