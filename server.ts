@@ -40,7 +40,7 @@ try {
 }
 
 // Load maps from maps.txt
-const mapsPath = path.join(__dirname, "maps.txt");
+const mapsPath = path.join(dataDir, "maps.txt");
 let floorPlanMaps: Record<string, string> = {};
 
 function loadMaps() {
@@ -70,6 +70,16 @@ function loadMaps() {
 }
 
 loadMaps();
+
+// Watch for changes in maps.txt
+if (fs.existsSync(mapsPath)) {
+  fs.watch(mapsPath, (eventType) => {
+    if (eventType === "change") {
+      console.log("[MAPS] maps.txt changed, reloading...");
+      loadMaps();
+    }
+  });
+}
 
 // Initialize database tables
 try {

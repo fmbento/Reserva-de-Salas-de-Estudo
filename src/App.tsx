@@ -1742,7 +1742,7 @@ export default function App() {
       const reservationsData = await reservationsRes.json();
       const allUsersData = await allUsersRes.json();
       const mapsData = await mapsRes.json();
-      
+      console.log("Fetched floor plan maps:", mapsData);
       setFloorPlanMaps(mapsData);
       console.log("Fetched all users:", allUsersData);
       setAllUsers(allUsersData);
@@ -2443,9 +2443,9 @@ export default function App() {
                         onChange={(e) => setSelectedFloor(e.target.value)}
                         className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
                       >
-                        <option value="1">{t.floorNum} 1</option>
-                        <option value="2">{t.floorNum} 2</option>
-                        <option value="3">{t.floorNum} 3</option>
+                        <option value="1">{t.floorNum.replace('{num}', '1')}</option>
+                        <option value="2">{t.floorNum.replace('{num}', '2')}</option>
+                        <option value="3">{t.floorNum.replace('{num}', '3')}</option>
                       </select>
                       <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
                       <select 
