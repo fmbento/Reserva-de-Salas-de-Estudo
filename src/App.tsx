@@ -1660,7 +1660,7 @@ export default function App() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [mapScale, setMapScale] = useState(1);
+  const [mapScale, setMapScale] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768 ? 0.6 : 1);
   const [mobileShowDetails, setMobileShowDetails] = useState(false);
   
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
@@ -2513,7 +2513,7 @@ export default function App() {
                 </div>
 
                 {/* Map Controls */}
-                <div className="flex absolute bottom-4 right-4 md:bottom-6 md:right-6 flex-col gap-2 z-10">
+                <div className="flex absolute bottom-24 right-4 md:bottom-6 md:right-6 flex-col gap-2 z-10">
                   <button 
                     onClick={() => setMapScale(prev => Math.min(prev + 0.2, 3))}
                     className="flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
