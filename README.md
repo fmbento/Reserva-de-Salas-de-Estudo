@@ -383,6 +383,11 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.3.2 (March 26, 2026)
+- **Map Alignment Fix**: Forced map container to a 1:1 aspect ratio (`aspect-square`) and used `object-cover` to ensure room markers stay correctly positioned regardless of window size.
+- **Inactive Room Filtering**: Updated map view to automatically hide rooms with "Inactive" status.
+- **Improved Map Visibility**: Increased map image opacity and removed text overlays for better clarity.
+
 ### Version 0.3.1 (March 26, 2026)
 - **Dynamic Floor Plans**: Implemented `maps.txt` in the `data/` directory for easy customization of floor plan images.
 - **Hot-Reloading Maps**: Added a file watcher to the server to automatically reload map mappings when `maps.txt` is updated.
