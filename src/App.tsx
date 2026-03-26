@@ -2468,7 +2468,7 @@ export default function App() {
                 </div>
 
                 {/* Map Container */}
-                <div className="absolute inset-0 flex items-center justify-center p-4 md:p-8 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors"
+                <div className="absolute inset-0 flex items-center justify-center p-1 md:p-4 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors"
                 >
                   <div 
                     className="relative aspect-square h-full max-h-full max-w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden"
@@ -2512,21 +2512,21 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Map Controls (Desktop Only) */}
-                <div className="hidden md:flex absolute bottom-6 right-6 flex-col gap-2">
+                {/* Map Controls */}
+                <div className="flex absolute bottom-4 right-4 md:bottom-6 md:right-6 flex-col gap-2 z-10">
                   <button 
                     onClick={() => setMapScale(prev => Math.min(prev + 0.2, 3))}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                     title="Aumentar Zoom"
                   >
-                    <Plus size={20} />
+                    <Plus size={18} className="md:w-5 md:h-5" />
                   </button>
                   <button 
                     onClick={() => setMapScale(prev => Math.max(prev - 0.2, 0.5))}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    className="flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                     title="Diminuir Zoom"
                   >
-                    <Minus size={20} />
+                    <Minus size={18} className="md:w-5 md:h-5" />
                   </button>
                 </div>
               </motion.div>
