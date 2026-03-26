@@ -199,6 +199,16 @@ export interface TranslationKeys {
   user: string;
   dateTime: string;
   subject: string;
+  
+  // Map Grouping
+  building: string;
+  floor: string;
+  section: string;
+  biblioteca: string;
+  mediateca: string;
+  front: string;
+  back: string;
+  floorNum: string;
 
   // Email Translations
   emailWelcomeSubject: string;
@@ -430,6 +440,16 @@ export const translations: Record<Language, TranslationKeys> = {
     user: "Utilizador",
     dateTime: "Data e Hora",
     subject: "Assunto",
+    
+    // Map Grouping
+    building: "Edifício",
+    floor: "Piso",
+    section: "Ala",
+    biblioteca: "Biblioteca",
+    mediateca: "Mediateca",
+    front: "Frente",
+    back: "Trás",
+    floorNum: "Piso {num}",
 
     // Email Translations
     emailWelcomeSubject: "Bem-vindo ao Sistema de Reserva de Salas UA",
@@ -659,6 +679,16 @@ export const translations: Record<Language, TranslationKeys> = {
     user: "User",
     dateTime: "Date and Time",
     subject: "Subject",
+    
+    // Map Grouping
+    building: "Building",
+    floor: "Floor",
+    section: "Section",
+    biblioteca: "Library",
+    mediateca: "Media Library",
+    front: "Front",
+    back: "Back",
+    floorNum: "Floor {num}",
 
     // Email Translations
     emailWelcomeSubject: "Welcome to UA Room Booking System",

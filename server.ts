@@ -52,13 +52,18 @@ try {
     CREATE TABLE IF NOT EXISTS rooms (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      building TEXT NOT NULL,
+      floor TEXT NOT NULL,
+      section TEXT NOT NULL,
       department TEXT NOT NULL,
       status TEXT NOT NULL,
       capacity INTEGER,
       description TEXT,
       operational_status TEXT DEFAULT 'Active',
       image TEXT,
-      amenities TEXT DEFAULT '[]'
+      amenities TEXT DEFAULT '[]',
+      top TEXT,
+      left TEXT
     );
 
     CREATE TABLE IF NOT EXISTS reservations (
@@ -128,14 +133,32 @@ const seedData = () => {
   const roomCount = db.prepare("SELECT count(*) as count FROM rooms").get() as { count: number };
   if (roomCount.count === 0) {
     const rooms = [
-      { id: '101', name: 'Sala de Estudo 101', department: 'Departamento de Engenharia', status: 'Available', capacity: 10, description: 'Sala equipada com projetor e quadro branco.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas', 'Projetor']) },
-      { id: '102', name: 'Sala de Estudo 102', department: 'Departamento de Engenharia', status: 'Available', capacity: 8, description: 'Sala ideal para trabalhos de grupo.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']) },
-      { id: '201', name: 'Laboratório 201', department: 'Departamento de Informática', status: 'Occupied', capacity: 20, description: 'Laboratório de computação avançada.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas', 'Smart Screen']) },
-      { id: '202', name: 'Laboratório 202', department: 'Departamento de Informática', status: 'Available', capacity: 15, description: 'Laboratório de redes.', operational_status: 'Maintenance', amenities: JSON.stringify(['Eduroam', 'Tomadas']) },
-      { id: '301', name: 'Anfiteatro 301', department: 'Departamento de Artes', status: 'Pending', capacity: 50, description: 'Anfiteatro para palestras.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Projetor', 'Ar Condicionado']) },
+      // Biblioteca (17), Piso 2, Trás
+      { id: '17.2.14', name: '17.2.14', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '90%', left: '43%' },
+      { id: '17.2.15', name: '17.2.15', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '83%', left: '40%' },
+      { id: '17.2.16', name: '17.2.16', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '78%', left: '37%' },
+      { id: '17.2.17', name: '17.2.17', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '73%', left: '34%' },
+      { id: '17.2.18', name: '17.2.18', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '66%', left: '28%' },
+      { id: '17.2.19', name: '17.2.19', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '60%', left: '25%' },
+      { id: '17.2.20', name: '17.2.20', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '54%', left: '22%' },
+      { id: '17.2.21', name: '17.2.21', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '48%', left: '19%' },
+      { id: '17.2.22', name: '17.2.22', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '42%', left: '16%' },
+      { id: '17.2.23', name: '17.2.23', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '10%', left: '75%' },
+      { id: '17.2.24', name: '17.2.24', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '20%', left: '78%' },
+      { id: '17.2.25', name: '17.2.25', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '27%', left: '82%' },
+      { id: '17.2.26', name: '17.2.26', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '34%', left: '86%' },
+      { id: '17.2.27', name: '17.2.27', building: '17', floor: '2', section: 'Trás', department: 'Biblioteca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '41%', left: '90%' },
+      
+      // Mediateca (18), Piso 1, Frente
+      { id: '18.1.01', name: '18.1.01', building: '18', floor: '1', section: 'Frente', department: 'Mediateca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '20%', left: '20%' },
+      { id: '18.1.02', name: '18.1.02', building: '18', floor: '1', section: 'Frente', department: 'Mediateca', status: 'Available', capacity: 1, description: 'Sala de estudo individual.', operational_status: 'Active', amenities: JSON.stringify(['Eduroam', 'Tomadas']), top: '30%', left: '25%' },
     ];
-    const insertRoom = db.prepare("INSERT INTO rooms (id, name, department, status, capacity, description, operational_status, amenities) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    rooms.forEach(room => insertRoom.run(room.id, room.name, room.department, room.status, room.capacity, room.description, room.operational_status, room.amenities));
+    const insertRoom = db.prepare("INSERT INTO rooms (id, name, building, floor, section, department, status, capacity, description, operational_status, amenities, top, left) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    rooms.forEach(room => insertRoom.run(room.id, room.name, room.building, room.floor, room.section, room.department, room.status, room.capacity, room.description, room.operational_status, room.amenities, room.top, room.left));
+  } else {
+    // One-time update for existing rooms to match the new requirements
+    db.prepare("UPDATE rooms SET capacity = 1, amenities = ? WHERE id LIKE '17.2.%' OR id LIKE '18.1.%'").run(JSON.stringify(['Eduroam', 'Tomadas']));
+    db.prepare("UPDATE rooms SET name = id WHERE id LIKE '17.2.%' OR id LIKE '18.1.%'").run();
   }
 
   const reservationCount = db.prepare("SELECT count(*) as count FROM reservations").get() as { count: number };
@@ -657,7 +680,10 @@ async function startServer() {
 
   app.put("/api/rooms/:id", (req, res) => {
     const { id } = req.params;
-    const { name, department, capacity, operationalStatus, operational_status, image, amenities } = req.body;
+    const { 
+      name, building, floor, section, top, left, 
+      department, capacity, operationalStatus, operational_status, image, amenities 
+    } = req.body;
     
     // Handle both camelCase and snake_case from frontend
     const opStatus = operationalStatus || operational_status;
@@ -665,10 +691,14 @@ async function startServer() {
     try {
       const stmt = db.prepare(`
         UPDATE rooms 
-        SET name = ?, department = ?, capacity = ?, operational_status = ?, image = ?, amenities = ?
+        SET name = ?, building = ?, floor = ?, section = ?, top = ?, left = ?, 
+            department = ?, capacity = ?, operational_status = ?, image = ?, amenities = ?
         WHERE id = ?
       `);
-      const result = stmt.run(name, department, capacity, opStatus, image, JSON.stringify(amenities), id);
+      const result = stmt.run(
+        name, building, floor, section, top, left, 
+        department, capacity, opStatus, image, JSON.stringify(amenities), id
+      );
       
       if (result.changes > 0) {
         broadcast({ type: 'ROOMS_UPDATED' });

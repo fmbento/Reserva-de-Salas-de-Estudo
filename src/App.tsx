@@ -61,6 +61,9 @@ const getAvailableAmenities = (t: any) => [
 interface Room {
   id: string;
   name: string;
+  building: string;
+  floor: string;
+  section: string;
   department: string;
   status: RoomStatus;
   operationalStatus: OperationalStatus;
@@ -746,6 +749,11 @@ const ManageRoomsView = ({
   
   // Local state for editing
   const [editName, setEditName] = useState('');
+  const [editBuilding, setEditBuilding] = useState('');
+  const [editFloor, setEditFloor] = useState('');
+  const [editSection, setEditSection] = useState('');
+  const [editTop, setEditTop] = useState('');
+  const [editLeft, setEditLeft] = useState('');
   const [editDept, setEditDept] = useState('');
   const [editCapacity, setEditCapacity] = useState(0);
   const [editStatus, setEditStatus] = useState<OperationalStatus>('Active');
@@ -755,12 +763,17 @@ const ManageRoomsView = ({
 
   useEffect(() => {
     if (selectedRoom) {
-      setEditName(selectedRoom.name);
-      setEditDept(selectedRoom.department);
-      setEditCapacity(selectedRoom.capacity);
-      setEditStatus(selectedRoom.operationalStatus);
-      setEditAmenities(selectedRoom.amenities);
-      setEditImage(selectedRoom.image);
+      setEditName(selectedRoom.name || '');
+      setEditBuilding(selectedRoom.building || '');
+      setEditFloor(selectedRoom.floor || '');
+      setEditSection(selectedRoom.section || '');
+      setEditTop(selectedRoom.top || '');
+      setEditLeft(selectedRoom.left || '');
+      setEditDept(selectedRoom.department || '');
+      setEditCapacity(selectedRoom.capacity || 0);
+      setEditStatus(selectedRoom.operationalStatus || 'Active');
+      setEditAmenities(selectedRoom.amenities || []);
+      setEditImage(selectedRoom.image || '');
     }
   }, [selectedRoom]);
 
@@ -769,6 +782,11 @@ const ManageRoomsView = ({
     setIsSaving(true);
     await onUpdateRoom(selectedRoomId, {
       name: editName,
+      building: editBuilding,
+      floor: editFloor,
+      section: editSection,
+      top: editTop,
+      left: editLeft,
       department: editDept,
       capacity: editCapacity,
       operationalStatus: editStatus,
@@ -840,7 +858,9 @@ const ManageRoomsView = ({
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                   <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.roomName}</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.department}</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.building}</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.floor}</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.section}</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.status}</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t.capacity}</th>
                 </tr>
@@ -864,7 +884,9 @@ const ManageRoomsView = ({
                         <span className="font-bold text-slate-900 dark:text-white">{room.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">{room.department}</td>
+                    <td className="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">{room.building}</td>
+                    <td className="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">{room.floor}</td>
+                    <td className="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">{room.section}</td>
                     <td className="px-6 py-5">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         room.operationalStatus === 'Active' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
@@ -941,6 +963,63 @@ const ManageRoomsView = ({
                   />
                 </div>
 
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.building}</label>
+                    <select 
+                      value={editBuilding}
+                      onChange={(e) => setEditBuilding(e.target.value)}
+                      className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
+                    >
+                      <option value="17">17</option>
+                      <option value="18">18</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.floor}</label>
+                    <input 
+                      type="text" 
+                      value={editFloor}
+                      onChange={(e) => setEditFloor(e.target.value)}
+                      className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.section}</label>
+                    <select 
+                      value={editSection}
+                      onChange={(e) => setEditSection(e.target.value)}
+                      className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
+                    >
+                      <option value="Frente">{t.front}</option>
+                      <option value="Trás">{t.back}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Posição Top (%)</label>
+                    <input 
+                      type="text" 
+                      value={editTop}
+                      onChange={(e) => setEditTop(e.target.value)}
+                      placeholder="Ex: 20%"
+                      className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Posição Left (%)</label>
+                    <input 
+                      type="text" 
+                      value={editLeft}
+                      onChange={(e) => setEditLeft(e.target.value)}
+                      placeholder="Ex: 30%"
+                      className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.department}</label>
                   <select 
@@ -965,7 +1044,7 @@ const ManageRoomsView = ({
                       type="number" 
                       inputMode="numeric"
                       value={editCapacity}
-                      onChange={(e) => setEditCapacity(parseInt(e.target.value))}
+                      onChange={(e) => setEditCapacity(parseInt(e.target.value) || 0)}
                       className="w-full pl-11 rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm font-bold focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
                     />
                   </div>
@@ -1586,6 +1665,24 @@ export default function App() {
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
   const [bookingMessage, setBookingMessage] = useState<string>('');
   
+  const [selectedBuilding, setSelectedBuilding] = useState('17');
+  const [selectedFloor, setSelectedFloor] = useState('2');
+  const [selectedSection, setSelectedSection] = useState('Trás');
+
+  const filteredRoomsForMap = useMemo(() => {
+    return rooms.filter(room => 
+      room.building === selectedBuilding && 
+      room.floor === selectedFloor && 
+      room.section === selectedSection
+    );
+  }, [rooms, selectedBuilding, selectedFloor, selectedSection]);
+
+  const getFloorPlanImage = (building: string, floor: string, section: string) => {
+    // For now, we'll use a placeholder that describes the floor plan
+    // In a real app, these would be URLs to the actual SVG or PNG files
+    return `https://picsum.photos/seed/ua-floorplan-${building}-${floor}-${section}/1200/800?grayscale&blur=2`;
+  };
+
   const [bookingDate, setBookingDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [bookingStartTime, setBookingStartTime] = useState<string>('09:00');
   const [bookingDuration, setBookingDuration] = useState<string>('1 Hora');
@@ -1648,8 +1745,8 @@ export default function App() {
         operationalStatus: r.operational_status || 'Active',
         amenities: r.amenities ? JSON.parse(r.amenities) : ['Eduroam', 'Tomadas'],
         image: r.image || 'https://picsum.photos/seed/' + r.id + '/800/600',
-        top: r.id === '101' ? '20%' : r.id === '102' ? '20%' : r.id === '201' ? '50%' : '70%',
-        left: r.id === '101' ? '15%' : r.id === '102' ? '30%' : r.id === '201' ? '45%' : '70%'
+        top: r.top || (r.id === '101' ? '20%' : r.id === '102' ? '20%' : r.id === '201' ? '50%' : '70%'),
+        left: r.left || (r.id === '101' ? '15%' : r.id === '102' ? '30%' : r.id === '201' ? '45%' : '70%')
       }));
 
       // Map database reservations to frontend Reservation interface
@@ -2317,12 +2414,44 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Legend / Filters */}
-                <div className="absolute top-20 md:top-4 left-4 z-10 flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-                  <div className="flex gap-2 rounded-xl border border-white dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-1 shadow-lg backdrop-blur">
-                    <LegendItem color="bg-emerald-500" label={t.statusAvailable.toUpperCase()} />
-                    <LegendItem color="bg-amber-500" label={t.statusPending.toUpperCase()} />
-                    <LegendItem color="bg-rose-500" label={t.statusOccupied.toUpperCase()} />
+                {/* Map Filters */}
+                <div className="absolute top-20 md:top-4 left-4 right-4 z-40 flex flex-col gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex gap-2 p-1.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-xl shadow-lg border border-white dark:border-slate-800">
+                      <select 
+                        value={selectedBuilding}
+                        onChange={(e) => setSelectedBuilding(e.target.value)}
+                        className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
+                      >
+                        <option value="17">{t.biblioteca}</option>
+                        <option value="18">{t.mediateca}</option>
+                      </select>
+                      <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
+                      <select 
+                        value={selectedFloor}
+                        onChange={(e) => setSelectedFloor(e.target.value)}
+                        className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
+                      >
+                        <option value="1">{t.floorNum} 1</option>
+                        <option value="2">{t.floorNum} 2</option>
+                        <option value="3">{t.floorNum} 3</option>
+                      </select>
+                      <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
+                      <select 
+                        value={selectedSection}
+                        onChange={(e) => setSelectedSection(e.target.value)}
+                        className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
+                      >
+                        <option value="Frente">{t.front}</option>
+                        <option value="Trás">{t.back}</option>
+                      </select>
+                    </div>
+
+                    <div className="flex gap-2 rounded-xl border border-white dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-1.5 shadow-lg backdrop-blur">
+                      <LegendItem color="bg-emerald-500" label={t.statusAvailable.toUpperCase()} />
+                      <LegendItem color="bg-amber-500" label={t.statusPending.toUpperCase()} />
+                      <LegendItem color="bg-rose-500" label={t.statusOccupied.toUpperCase()} />
+                    </div>
                   </div>
                 </div>
 
@@ -2339,8 +2468,23 @@ export default function App() {
                     {/* Mock Floor Plan Background */}
                     <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
                     
+                    {/* Floor Plan Image */}
+                    <div className="absolute inset-0 flex items-center justify-center p-8">
+                      <img 
+                        src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
+                        alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
+                        className="max-w-full max-h-full object-contain opacity-40 dark:opacity-20 transition-opacity duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+                        <span className="text-4xl md:text-6xl font-black text-slate-900/5 dark:text-white/5 uppercase tracking-[0.2em]">
+                          {selectedBuilding}.{selectedFloor} {selectedSection}
+                        </span>
+                      </div>
+                    </div>
+                    
                     {/* Room Markers */}
-                    {rooms.map((room) => {
+                    {filteredRoomsForMap.map((room) => {
                       const dynamicStatus = getDynamicRoomStatus(room.id, bookingDate, bookingStartTime);
                       const statusColor = dynamicStatus === 'Available' ? 'bg-emerald-500' : 
                                          dynamicStatus === 'Pending' ? 'bg-amber-500' : 'bg-rose-500';
@@ -3086,7 +3230,7 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMark
           animate={{ scale: isSelected ? 1.1 : 1 }}
           className={`px-3 py-1 text-white text-[10px] font-bold rounded-full shadow-lg border-2 ${isSelected ? 'border-rose-600' : 'border-white'} ${statusColor}`}
         >
-          R.{room.id}
+          {room.id}
         </motion.div>
       </div>
     </button>

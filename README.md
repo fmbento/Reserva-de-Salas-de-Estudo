@@ -358,6 +358,13 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.3.0 (March 26, 2026)
+- **Hierarchical Room Mapping**: Organized rooms by Building, Floor, and Section (Front/Back) with interactive filters.
+- **User Management**: New administrative view to search users by email and manage roles (User, Librarian, Blocked).
+- **Security Enhancements**: Implemented "Blocked" status to prevent access for specific accounts.
+- **Data Standardization**: Standardized room capacities to 1 and default amenities (Eduroam, Tomadas) for study rooms.
+- **UI Refinements**: Integrated official UA logo in header and login, improved navigation, and fixed theme toggle issues.
+
 ### Version 0.2.0 (March 25, 2026)
 - **Official Branding**: Integrated official University of Aveiro logo in login and navigation.
 - **Tailwind CSS v4**: Upgraded styling engine for better performance and modern features.
@@ -376,7 +383,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** March 25, 2026
+**Last Updated:** March 26, 2026
 ```
 
 This README provides:
