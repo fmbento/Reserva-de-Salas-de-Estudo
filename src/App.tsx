@@ -34,6 +34,7 @@ import {
   Check,
   RotateCcw,
   Upload,
+  Save,
   ArrowRight,
   Sun,
   Moon,
@@ -732,11 +733,13 @@ const BackofficeView = ({
 const ManageRoomsView = ({ 
   rooms, 
   onUpdateRoom,
+  onCreateRoom,
   onBack,
   lang
 }: { 
   rooms: Room[], 
   onUpdateRoom: (id: string, data: Partial<Room>) => Promise<void>,
+  onCreateRoom: (data: Partial<Room>) => Promise<any>,
   onBack: () => void,
   lang: string
 }) => {
@@ -744,10 +747,12 @@ const ManageRoomsView = ({
   const AVAILABLE_AMENITIES = getAvailableAmenities(t);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(rooms[0]?.id || null);
   const [filter, setFilter] = useState<'All' | 'Active' | 'Maintenance'>('All');
+  const [isAddingNew, setIsAddingNew] = useState(false);
   
   const selectedRoom = rooms.find(r => r.id === selectedRoomId);
   
   // Local state for editing
+  const [editId, setEditId] = useState('');
   const [editName, setEditName] = useState('');
   const [editBuilding, setEditBuilding] = useState('');
   const [editFloor, setEditFloor] = useState('');
@@ -762,7 +767,8 @@ const ManageRoomsView = ({
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (selectedRoom) {
+    if (selectedRoom && !isAddingNew) {
+      setEditId(selectedRoom.id);
       setEditName(selectedRoom.name || '');
       setEditBuilding(selectedRoom.building || '');
       setEditFloor(selectedRoom.floor || '');
@@ -775,12 +781,29 @@ const ManageRoomsView = ({
       setEditAmenities(selectedRoom.amenities || []);
       setEditImage(selectedRoom.image || '');
     }
-  }, [selectedRoom]);
+  }, [selectedRoom, isAddingNew]);
+
+  const handleAddNew = () => {
+    setIsAddingNew(true);
+    setSelectedRoomId(null);
+    setEditId('');
+    setEditName('');
+    setEditBuilding('17');
+    setEditFloor('1');
+    setEditSection('Frente');
+    setEditTop('50%');
+    setEditLeft('50%');
+    setEditDept('Biblioteca');
+    setEditCapacity(1);
+    setEditStatus('Active');
+    setEditAmenities([]);
+    setEditImage('');
+  };
 
   const handleSave = async () => {
-    if (!selectedRoomId) return;
     setIsSaving(true);
-    await onUpdateRoom(selectedRoomId, {
+    const roomData = {
+      id: editId,
       name: editName,
       building: editBuilding,
       floor: editFloor,
@@ -792,7 +815,17 @@ const ManageRoomsView = ({
       operationalStatus: editStatus,
       amenities: editAmenities,
       image: editImage
-    });
+    };
+
+    if (isAddingNew) {
+      const result = await onCreateRoom(roomData);
+      if (result) {
+        setIsAddingNew(false);
+        setSelectedRoomId(result.id);
+      }
+    } else if (selectedRoomId) {
+      await onUpdateRoom(selectedRoomId, roomData);
+    }
     setIsSaving(false);
   };
 
@@ -827,25 +860,35 @@ const ManageRoomsView = ({
             </div>
           </div>
           
-          <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl transition-colors">
+          <div className="flex items-center gap-4">
             <button 
-              onClick={() => setFilter('All')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'All' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+              onClick={handleAddNew}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 transition-all shadow-sm"
             >
-              {t.all}
+              <Plus size={20} />
+              <span className="hidden sm:inline">{t.addNewRoom}</span>
             </button>
-            <button 
-              onClick={() => setFilter('Active')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Active' ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-              {t.active}
-            </button>
-            <button 
-              onClick={() => setFilter('Maintenance')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Maintenance' ? 'bg-white dark:bg-slate-700 text-amber-600 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
-            >
-              {t.maintenance}
-            </button>
+
+            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl transition-colors">
+              <button 
+                onClick={() => { setFilter('All'); setIsAddingNew(false); }}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'All' && !isAddingNew ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+              >
+                {t.all}
+              </button>
+              <button 
+                onClick={() => { setFilter('Active'); setIsAddingNew(false); }}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Active' && !isAddingNew ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+              >
+                {t.active}
+              </button>
+              <button 
+                onClick={() => { setFilter('Maintenance'); setIsAddingNew(false); }}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filter === 'Maintenance' && !isAddingNew ? 'bg-white dark:bg-slate-700 text-amber-600 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+              >
+                {t.maintenance}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -869,8 +912,11 @@ const ManageRoomsView = ({
                 {filteredRooms.map((room) => (
                   <tr 
                     key={room.id} 
-                    onClick={() => setSelectedRoomId(room.id)}
-                    className={`cursor-pointer transition-colors ${selectedRoomId === room.id ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                    onClick={() => {
+                      setSelectedRoomId(room.id);
+                      setIsAddingNew(false);
+                    }}
+                    className={`cursor-pointer transition-colors ${selectedRoomId === room.id && !isAddingNew ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                   >
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
@@ -912,11 +958,15 @@ const ManageRoomsView = ({
 
         {/* Edit Panel */}
         <div className="w-full md:w-96 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 overflow-y-auto p-8 transition-colors">
-          {selectedRoom ? (
+          {selectedRoom || isAddingNew ? (
             <div className="space-y-8">
               <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">{t.editDetails}</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{t.editing} "{selectedRoom.name}"</p>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                  {isAddingNew ? t.addNewRoom : t.editDetails}
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {isAddingNew ? t.manageRoomsSubtitle : `${t.editing} "${selectedRoom?.name}"`}
+                </p>
               </div>
 
               {/* Image Section */}
@@ -953,6 +1003,18 @@ const ManageRoomsView = ({
 
               {/* Form Fields */}
               <div className="space-y-5">
+                {isAddingNew && (
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">ID (ex: 17.2.14)</label>
+                    <input 
+                      type="text" 
+                      value={editId}
+                      onChange={(e) => setEditId(e.target.value)}
+                      placeholder="17.2.14"
+                      className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
+                    />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.roomName}</label>
                   <input 
@@ -1144,13 +1206,21 @@ const ManageRoomsView = ({
               <div className="flex gap-3 pt-4">
                 <button 
                   onClick={handleSave}
-                  disabled={isSaving}
+                  disabled={isSaving || (isAddingNew && !editId)}
                   className="flex-1 bg-primary text-white py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {isSaving ? <Loader2 size={18} className="animate-spin" /> : t.save}
+                  {isSaving ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    isAddingNew ? <Plus size={18} /> : <Save size={18} />
+                  )}
+                  {isAddingNew ? t.add : t.save}
                 </button>
                 <button 
-                  onClick={() => setSelectedRoomId(null)}
+                  onClick={() => {
+                    setSelectedRoomId(null);
+                    setIsAddingNew(false);
+                  }}
                   className="px-6 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 py-3.5 rounded-xl font-bold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                 >
                   {t.cancel}
@@ -1160,11 +1230,17 @@ const ManageRoomsView = ({
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
               <div className="h-20 w-20 bg-slate-50 dark:bg-slate-800 rounded-3xl flex items-center justify-center text-slate-300 dark:text-slate-700">
-                <ImageIcon size={40} />
+                <Building2 size={40} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{lang === 'pt' ? 'Nenhuma sala selecionada' : 'No room selected'}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-[200px] mx-auto">{lang === 'pt' ? 'Selecione uma sala na lista para editar os seus detalhes.' : 'Select a room from the list to edit its details.'}</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {lang === 'pt' ? 'Nenhuma sala selecionada' : 'No room selected'}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-[200px] mx-auto">
+                  {lang === 'pt' 
+                    ? 'Selecione uma sala na lista para editar ou clique em "Adicionar Nova Sala".' 
+                    : 'Select a room from the list to edit or click "Add New Room".'}
+                </p>
               </div>
             </div>
           )}
@@ -2141,6 +2217,33 @@ export default function App() {
     }
   };
 
+  const handleCreateRoom = async (newRoomData: Partial<Room>) => {
+    try {
+      const response = await fetch(`/api/rooms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newRoomData, lang })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create room");
+      }
+
+      const createdRoom = await response.json();
+      setRooms(prev => [...prev, createdRoom]);
+      setBookingStatus('success');
+      setBookingMessage(t.roomCreatedSuccess);
+      setTimeout(() => setBookingStatus('idle'), 3000);
+      return createdRoom;
+    } catch (error: any) {
+      console.error("Creation failed:", error);
+      setBookingStatus('error');
+      setBookingMessage(error.message === "Failed to create room" ? t.errorCreatingRoom : error.message);
+      return null;
+    }
+  };
+
   const getStatusColor = (status: RoomStatus) => {
     switch (status) {
       case 'Available': return 'bg-emerald-500';
@@ -2657,6 +2760,7 @@ export default function App() {
               <ManageRoomsView 
                 rooms={rooms}
                 onUpdateRoom={handleUpdateRoom}
+                onCreateRoom={handleCreateRoom}
                 onBack={() => setCurrentView('backoffice')}
                 lang={lang}
               />

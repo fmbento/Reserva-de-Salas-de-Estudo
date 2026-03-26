@@ -86,6 +86,7 @@ export interface TranslationKeys {
   delete: string;
   errorCreatingBooking: string;
   errorUpdatingRoom: string;
+  errorCreatingRoom: string;
   confirmBooking: string;
   checkingAvailability: string;
   checking: string;
@@ -95,6 +96,7 @@ export interface TranslationKeys {
   reservationApprovedSuccess: string;
   reservationRejectedSuccess: string;
   roomUpdatedSuccess: string;
+  roomCreatedSuccess: string;
   userUpdatedSuccess: string;
   simulateUser: string;
 
@@ -169,6 +171,7 @@ export interface TranslationKeys {
   backofficeSubtitle: string;
   manageRooms: string;
   manageRoomsSubtitle: string;
+  addNewRoom: string;
   manageReservations: string;
   allRooms: string;
   allReservations: string;
@@ -326,6 +329,7 @@ export const translations: Record<Language, TranslationKeys> = {
     delete: "Eliminar",
     errorCreatingBooking: "Erro ao criar reserva",
     errorUpdatingRoom: "Erro ao atualizar a sala.",
+    errorCreatingRoom: "Erro ao criar a sala.",
     confirmBooking: "Confirmar Reserva",
     checkingAvailability: "A verificar disponibilidade em tempo real...",
     checking: "A verificar...",
@@ -335,6 +339,7 @@ export const translations: Record<Language, TranslationKeys> = {
     reservationApprovedSuccess: "Reserva aprovada com sucesso.",
     reservationRejectedSuccess: "Reserva recusada com sucesso.",
     roomUpdatedSuccess: "Sala atualizada com sucesso.",
+    roomCreatedSuccess: "Sala criada com sucesso.",
     userUpdatedSuccess: "Utilizador atualizado com sucesso.",
     simulateUser: "Simular Utilizador",
 
@@ -409,6 +414,7 @@ export const translations: Record<Language, TranslationKeys> = {
     backofficeSubtitle: "Gestão global de salas e reservas do sistema.",
     manageRooms: "Gerir Salas",
     manageRoomsSubtitle: "Adicione, edite ou remova salas do sistema.",
+    addNewRoom: "Adicionar Nova Sala",
     manageReservations: "Gerir Reservas",
     allRooms: "Todas as Salas",
     allReservations: "Todas as Reservas",
@@ -564,6 +570,7 @@ export const translations: Record<Language, TranslationKeys> = {
     delete: "Delete",
     errorCreatingBooking: "Error creating reservation",
     errorUpdatingRoom: "Error updating room.",
+    errorCreatingRoom: "Error creating room.",
     confirmBooking: "Confirm Reservation",
     checkingAvailability: "Checking availability in real-time...",
     checking: "Checking...",
@@ -573,6 +580,7 @@ export const translations: Record<Language, TranslationKeys> = {
     reservationApprovedSuccess: "Reservation approved successfully.",
     reservationRejectedSuccess: "Reservation rejected successfully.",
     roomUpdatedSuccess: "Room updated successfully.",
+    roomCreatedSuccess: "Room created successfully.",
     userUpdatedSuccess: "User updated successfully.",
     simulateUser: "Simulate User",
 
@@ -647,6 +655,7 @@ export const translations: Record<Language, TranslationKeys> = {
     backofficeSubtitle: "Global management of rooms and reservations.",
     manageRooms: "Manage Rooms",
     manageRoomsSubtitle: "Add, edit or remove rooms from the system.",
+    addNewRoom: "Add New Room",
     manageReservations: "Manage Reservations",
     allRooms: "All Rooms",
     allReservations: "All Reservations",
