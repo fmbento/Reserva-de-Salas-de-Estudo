@@ -1,7 +1,7 @@
 17-1-Frente: https://picsum.photos/seed/ua-17-1-Frente/1200/800
 17-1-Trás: https://picsum.photos/seed/ua-17-1-Trás/1200/800
 17-2-Frente: https://picsum.photos/seed/ua-17-2-Frente/1200/800
-17-2-Trás: https://api-assets.ua.pt/files/imgs/000/035/168/original.png
+17-2-Trás: https://api-assets.ua.pt/files/imgs/000/035/175/original.png
 17-3-Frente: https://picsum.photos/seed/ua-17-3-Frente/1200/800
 17-3-Trás: https://picsum.photos/seed/ua-17-3-Trás/1200/800
 18-1-Frente: https://picsum.photos/seed/ua-18-1-Frente/1200/800

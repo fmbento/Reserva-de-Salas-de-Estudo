@@ -130,8 +130,30 @@ Reserva-de-Salas-de-Estudo/
 ├── Dockerfile           # Docker image definition
 ├── .env.example         # Environment variables template
 └── data/
-    └── salas.db         # SQLite database (auto-created)
+    ├── salas.db         # SQLite database (auto-created)
+    └── maps.txt         # Floor plan image mappings (auto-reloads on change)
 ```
+
+---
+
+## 🗺️ Floor Plan Customization
+
+The system allows dynamic customization of floor plan images without restarting the server.
+
+### Configuration
+Edit the file `data/maps.txt` to map building/floor/section combinations to image URLs. The format is `Building-Floor-Section: URL`.
+
+**Example `data/maps.txt`:**
+```text
+17-1-Frente: https://api-assets.ua.pt/files/imgs/000/035/167/original.png
+17-2-Trás: https://api-assets.ua.pt/files/imgs/000/035/168/original.png
+18-1-Frente: https://picsum.photos/seed/ua-18-1-Frente/1200/800
+```
+
+### Features
+- **Automatic Reload**: The server watches for changes in `data/maps.txt` and reloads the mappings instantly.
+- **Persistent Volume**: In Docker deployments, this file is stored in the `/data` volume, making it easy to manage from the host machine.
+- **Fallback**: If a mapping is not found, the system uses a default placeholder image.
 
 ---
 
@@ -269,6 +291,9 @@ Emails are formatted in Portuguese and include:
 - `GET /api/users` - List all users
 - `GET /api/user/me` - Get current user profile
 
+### Maps
+- `GET /api/maps` - Get floor plan image mappings
+
 ### Health
 - `GET /api/health` - Health check endpoint
 
@@ -357,6 +382,11 @@ For support, please contact:
 ---
 
 ## 🔄 Changelog
+
+### Version 0.3.1 (March 26, 2026)
+- **Dynamic Floor Plans**: Implemented `maps.txt` in the `data/` directory for easy customization of floor plan images.
+- **Hot-Reloading Maps**: Added a file watcher to the server to automatically reload map mappings when `maps.txt` is updated.
+- **Map View Optimization**: Removed text overlays from maps and improved image scaling (`object-contain`) to maintain aspect ratio.
 
 ### Version 0.3.0 (March 26, 2026)
 - **Hierarchical Room Mapping**: Organized rooms by Building, Floor, and Section (Front/Back) with interactive filters.
