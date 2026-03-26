@@ -208,7 +208,6 @@ export interface TranslationKeys {
   mediateca: string;
   front: string;
   back: string;
-  floorNum: string;
 
   // Email Translations
   emailWelcomeSubject: string;
@@ -449,7 +448,6 @@ export const translations: Record<Language, TranslationKeys> = {
     mediateca: "Mediateca",
     front: "Frente",
     back: "Trás",
-    floorNum: "Piso {num}",
 
     // Email Translations
     emailWelcomeSubject: "Bem-vindo ao Sistema de Reserva de Salas UA",
@@ -688,7 +686,6 @@ export const translations: Record<Language, TranslationKeys> = {
     mediateca: "Media Library",
     front: "Front",
     back: "Back",
-    floorNum: "Floor {num}",
 
     // Email Translations
     emailWelcomeSubject: "Welcome to UA Room Booking System",

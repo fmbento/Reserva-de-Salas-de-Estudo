@@ -2444,9 +2444,9 @@ export default function App() {
                         onChange={(e) => setSelectedFloor(e.target.value)}
                         className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
                       >
-                        <option value="1">{t.floorNum} 1</option>
-                        <option value="2">{t.floorNum} 2</option>
-                        <option value="3">{t.floorNum} 3</option>
+                        <option value="1">{t.floor} 1</option>
+                        <option value="2">{t.floor} 2</option>
+                        <option value="3">{t.floor} 3</option>
                       </select>
                       <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
                       <select 
