@@ -39,6 +39,38 @@ try {
   process.exit(1);
 }
 
+// Load maps from maps.txt
+const mapsPath = path.join(__dirname, "maps.txt");
+let floorPlanMaps: Record<string, string> = {};
+
+function loadMaps() {
+  try {
+    if (fs.existsSync(mapsPath)) {
+      const content = fs.readFileSync(mapsPath, "utf-8");
+      const lines = content.split("\n");
+      const newMaps: Record<string, string> = {};
+      lines.forEach(line => {
+        const parts = line.split(":");
+        if (parts.length >= 2) {
+          const key = parts[0].trim();
+          const value = parts.slice(1).join(":").trim();
+          if (key && value) {
+            newMaps[key] = value;
+          }
+        }
+      });
+      floorPlanMaps = newMaps;
+      console.log(`[MAPS] Loaded ${Object.keys(floorPlanMaps).length} floor plans from maps.txt`);
+    } else {
+      console.warn(`[MAPS] maps.txt not found at ${mapsPath}`);
+    }
+  } catch (error) {
+    console.error("[MAPS] Failed to load maps.txt:", error);
+  }
+}
+
+loadMaps();
+
 // Initialize database tables
 try {
   db.exec(`
@@ -95,6 +127,11 @@ try {
 try { db.exec("ALTER TABLE rooms ADD COLUMN operational_status TEXT DEFAULT 'Active'"); } catch(e) {}
 try { db.exec("ALTER TABLE rooms ADD COLUMN image TEXT"); } catch(e) {}
 try { db.exec("ALTER TABLE rooms ADD COLUMN amenities TEXT DEFAULT '[]'"); } catch(e) {}
+try { db.exec("ALTER TABLE rooms ADD COLUMN building TEXT DEFAULT ''"); } catch(e) {}
+try { db.exec("ALTER TABLE rooms ADD COLUMN floor TEXT DEFAULT ''"); } catch(e) {}
+try { db.exec("ALTER TABLE rooms ADD COLUMN section TEXT DEFAULT ''"); } catch(e) {}
+try { db.exec("ALTER TABLE rooms ADD COLUMN top TEXT DEFAULT ''"); } catch(e) {}
+try { db.exec("ALTER TABLE rooms ADD COLUMN left TEXT DEFAULT ''"); } catch(e) {}
 
 // Seed initial data
 const seedData = () => {
@@ -393,6 +430,10 @@ async function startServer() {
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
+  app.get("/api/maps", (req, res) => {
+    res.json(floorPlanMaps);
   });
 
   // Auth Endpoints
@@ -696,8 +737,18 @@ async function startServer() {
         WHERE id = ?
       `);
       const result = stmt.run(
-        name, building, floor, section, top, left, 
-        department, capacity, opStatus, image, JSON.stringify(amenities), id
+        name || '', 
+        building || '', 
+        floor || '', 
+        section || '', 
+        top || '', 
+        left || '', 
+        department || '', 
+        capacity || 0, 
+        opStatus || 'Active', 
+        image || '', 
+        JSON.stringify(amenities || []), 
+        id
       );
       
       if (result.changes > 0) {

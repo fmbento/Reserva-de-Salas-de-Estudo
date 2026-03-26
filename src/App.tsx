@@ -999,22 +999,22 @@ const ManageRoomsView = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Posição Top (%)</label>
-                    <input 
-                      type="text" 
-                      value={editTop}
-                      onChange={(e) => setEditTop(e.target.value)}
-                      placeholder="Ex: 20%"
-                      className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Posição Left (%)</label>
                     <input 
                       type="text" 
                       value={editLeft}
                       onChange={(e) => setEditLeft(e.target.value)}
                       placeholder="Ex: 30%"
+                      className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Posição Top (%)</label>
+                    <input 
+                      type="text" 
+                      value={editTop}
+                      onChange={(e) => setEditTop(e.target.value)}
+                      placeholder="Ex: 20%"
                       className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
                     />
                   </div>
@@ -1632,6 +1632,7 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice' | 'manage-rooms' | 'manage-users'>('map');
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [floorPlanMaps, setFloorPlanMaps] = useState<Record<string, string>>({});
   const [selectedRoomId, setSelectedRoomId] = useState<string>('101');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
@@ -1678,8 +1679,11 @@ export default function App() {
   }, [rooms, selectedBuilding, selectedFloor, selectedSection]);
 
   const getFloorPlanImage = (building: string, floor: string, section: string) => {
-    // For now, we'll use a placeholder that describes the floor plan
-    // In a real app, these would be URLs to the actual SVG or PNG files
+    const key = `${building}-${floor}-${section}`;
+    if (floorPlanMaps[key]) {
+      return floorPlanMaps[key];
+    }
+    // Fallback to placeholder if not in maps.txt
     return `https://picsum.photos/seed/ua-floorplan-${building}-${floor}-${section}/1200/800?grayscale&blur=2`;
   };
 
@@ -1727,15 +1731,19 @@ export default function App() {
   // Fetch initial data
   const fetchData = async () => {
     try {
-      const [roomsRes, reservationsRes, allUsersRes] = await Promise.all([
+      const [roomsRes, reservationsRes, allUsersRes, mapsRes] = await Promise.all([
         fetch('/api/rooms'),
         fetch('/api/reservations'),
-        fetch('/api/users')
+        fetch('/api/users'),
+        fetch('/api/maps')
       ]);
 
       const roomsData = await roomsRes.json();
       const reservationsData = await reservationsRes.json();
       const allUsersData = await allUsersRes.json();
+      const mapsData = await mapsRes.json();
+      
+      setFloorPlanMaps(mapsData);
       console.log("Fetched all users:", allUsersData);
       setAllUsers(allUsersData);
 
@@ -2113,19 +2121,22 @@ export default function App() {
       const response = await fetch(`/api/rooms/${roomId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedData)
+        body: JSON.stringify({ ...updatedData, lang })
       });
 
-      if (!response.ok) throw new Error("Failed to update room");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to update room");
+      }
 
       setRooms(prev => prev.map(r => r.id === roomId ? { ...r, ...updatedData } : r));
       setBookingStatus('success');
       setBookingMessage(t.roomUpdatedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Update failed:", error);
       setBookingStatus('error');
-      setBookingMessage(t.errorUpdatingRoom);
+      setBookingMessage(error.message === "Failed to update room" ? t.errorUpdatingRoom : error.message);
     }
   };
 
@@ -2469,18 +2480,13 @@ export default function App() {
                     <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
                     
                     {/* Floor Plan Image */}
-                    <div className="absolute inset-0 flex items-center justify-center p-8">
+                    <div className="absolute inset-0">
                       <img 
                         src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
                         alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
-                        className="max-w-full max-h-full object-contain opacity-40 dark:opacity-20 transition-opacity duration-500"
+                        className="w-full h-full object-contain opacity-80 dark:opacity-60 transition-opacity duration-500"
                         referrerPolicy="no-referrer"
                       />
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                        <span className="text-4xl md:text-6xl font-black text-slate-900/5 dark:text-white/5 uppercase tracking-[0.2em]">
-                          {selectedBuilding}.{selectedFloor} {selectedSection}
-                        </span>
-                      </div>
                     </div>
                     
                     {/* Room Markers */}
@@ -3230,7 +3236,7 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMark
           animate={{ scale: isSelected ? 1.1 : 1 }}
           className={`px-3 py-1 text-white text-[10px] font-bold rounded-full shadow-lg border-2 ${isSelected ? 'border-rose-600' : 'border-white'} ${statusColor}`}
         >
-          {room.id}
+          {room.name}
         </motion.div>
       </div>
     </button>
