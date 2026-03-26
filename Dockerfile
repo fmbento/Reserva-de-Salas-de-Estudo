@@ -31,6 +31,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/server.ts ./server.ts
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/data ./data
 # Se o seu server.ts precisa de tsx para rodar:
 COPY --from=builder /app/node_modules/.bin/tsx ./node_modules/.bin/tsx
 
@@ -41,4 +43,4 @@ ENV NODE_ENV=production
 EXPOSE 3000
 
 # Comando para rodar (usando tsx conforme seu package.json)
-CMD ["npx", "tsx", "server.ts"]
+CMD ["./node_modules/.bin/tsx", "server.ts"]
