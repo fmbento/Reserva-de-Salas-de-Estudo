@@ -728,6 +728,56 @@ async function startServer() {
     }
   });
 
+  app.post("/api/rooms", (req, res) => {
+    const { 
+      id, name, building, floor, section, top, left, 
+      department, capacity, operationalStatus, operational_status, image, amenities, lang 
+    } = req.body;
+    
+    const userLang = (lang as Language) || 'pt';
+    const t = translations[userLang];
+    const opStatus = operationalStatus || operational_status || 'Active';
+
+    if (!id || !name) {
+      return res.status(400).json({ error: t.incompleteRoomData || "ID and Name are required" });
+    }
+
+    try {
+      // Check if room ID already exists
+      const existing = db.prepare("SELECT id FROM rooms WHERE id = ?").get(id);
+      if (existing) {
+        return res.status(409).json({ error: t.roomIdAlreadyExists || "Room ID already exists" });
+      }
+
+      const stmt = db.prepare(`
+        INSERT INTO rooms (id, name, building, floor, section, top, left, department, capacity, status, operational_status, image, amenities)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?, ?, ?)
+      `);
+      
+      stmt.run(
+        id,
+        name,
+        building || '',
+        floor || '',
+        section || '',
+        top || '',
+        left || '',
+        department || '',
+        capacity || 0,
+        opStatus,
+        image || '',
+        JSON.stringify(amenities || [])
+      );
+
+      const newRoom = db.prepare("SELECT * FROM rooms WHERE id = ?").get(id);
+      broadcast({ type: 'ROOMS_UPDATED' });
+      res.status(201).json(newRoom);
+    } catch (error: any) {
+      console.error("Error creating room:", error);
+      res.status(500).json({ error: t.internalServerError, details: error.message });
+    }
+  });
+
   app.put("/api/rooms/:id", (req, res) => {
     const { id } = req.params;
     const { 
