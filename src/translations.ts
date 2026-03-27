@@ -48,6 +48,8 @@ export interface TranslationKeys {
   incorrectOtp: string;
   expiredOtp: string;
   incompleteBookingData: string;
+  incompleteRoomData: string;
+  roomIdAlreadyExists: string;
   userNotFoundInDb: string;
   userNotFoundLoginAgain: string;
   roomNotFound: string;
@@ -291,6 +293,8 @@ export const translations: Record<Language, TranslationKeys> = {
     incorrectOtp: "Código incorreto.",
     expiredOtp: "Código expirado.",
     incompleteBookingData: "Dados da reserva incompletos.",
+    incompleteRoomData: "Dados da sala incompletos. ID e Nome são obrigatórios.",
+    roomIdAlreadyExists: "Este ID de sala já existe.",
     userNotFoundInDb: "Utilizador não identificado e nenhum utilizador encontrado na base de dados.",
     userNotFoundLoginAgain: "Utilizador não encontrado. Por favor, faça login novamente.",
     roomNotFound: "Sala não encontrada.",
@@ -532,6 +536,8 @@ export const translations: Record<Language, TranslationKeys> = {
     incorrectOtp: "Incorrect code.",
     expiredOtp: "Expired code.",
     incompleteBookingData: "Incomplete booking data.",
+    incompleteRoomData: "Incomplete room data. ID and Name are required.",
+    roomIdAlreadyExists: "This Room ID already exists.",
     userNotFoundInDb: "User not identified and no user found in the database.",
     userNotFoundLoginAgain: "User not found. Please login again.",
     roomNotFound: "Room not found.",
