@@ -279,6 +279,7 @@ Emails are formatted in Portuguese and include:
 
 ### Rooms
 - `GET /api/rooms` - List all rooms
+- `POST /api/rooms` - Create new room (admin only)
 - `PUT /api/rooms/:id` - Update room details (admin only)
 
 ### Reservations
@@ -383,6 +384,12 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.3.3 (March 27, 2026)
+- **Room Creation**: Implemented "Add New Room" functionality in the Backoffice with a dedicated `POST /api/rooms` endpoint.
+- **Improved Validation**: Added server-side validation for room IDs to prevent duplicates and ensure data integrity.
+- **Deployment Fixes**: Resolved critical deployment errors related to ESM module resolution and production dependencies in Cloud Run.
+- **Enhanced Translations**: Added new translation keys for room management errors and success messages in both Portuguese and English.
+
 ### Version 0.3.2 (March 26, 2026)
 - **Map Alignment Fix**: Forced map container to a 1:1 aspect ratio (`aspect-square`) and used `object-cover` to ensure room markers stay correctly positioned regardless of window size.
 - **Inactive Room Filtering**: Updated map view to automatically hide rooms with "Inactive" status.
@@ -418,7 +425,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** March 26, 2026
+**Last Updated:** March 27, 2026
 ```
 
 This README provides:
