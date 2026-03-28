@@ -269,7 +269,7 @@ export const translations: Record<Language, TranslationKeys> = {
     
     // Navigation & General
     navMap: "Mapa de Salas",
-    navMyReservations: "Minhas Reservas",
+    navMyReservations: "As Minhas Reservas",
     navSchedules: "Horários",
     navBackoffice: "Backoffice",
     systemTitle: "Reserva de Salas",
