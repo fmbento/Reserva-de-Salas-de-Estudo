@@ -2466,7 +2466,7 @@ export default function App() {
         <aside className="hidden md:flex w-64 flex-col justify-between border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shrink-0 transition-colors">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col">
-              <h1 className="text-base font-semibold text-slate-900 dark:text-white">{t.uaTitle}</h1>
+              <h1 className="text-base font-semibold text-slate-900 dark:text-white">{t.sidebarTitle}</h1>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mt-1">{t.systemTitle}</p>
             </div>
             

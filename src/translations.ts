@@ -27,6 +27,7 @@ export interface TranslationKeys {
   navSchedules: string;
   navBackoffice: string;
   systemTitle: string;
+  sidebarTitle: string;
   uaTitle: string;
   libraryInfo: string;
   settings: string;
@@ -272,6 +273,7 @@ export const translations: Record<Language, TranslationKeys> = {
     navSchedules: "Horários",
     navBackoffice: "Backoffice",
     systemTitle: "Reserva de Salas",
+    sidebarTitle: "Bibliotecas da UA",
     uaTitle: "Universidade de Aveiro",
     libraryInfo: "Biblioteca Geral • UA",
     settings: "Definições",
@@ -515,6 +517,7 @@ export const translations: Record<Language, TranslationKeys> = {
     navSchedules: "Schedules",
     navBackoffice: "Backoffice",
     systemTitle: "Room Booking",
+    sidebarTitle: "UA Libraries",
     uaTitle: "University of Aveiro",
     libraryInfo: "General Library • UA",
     settings: "Settings",
