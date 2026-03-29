@@ -2571,30 +2571,35 @@ export default function App() {
                 </div>
 
                 {/* Map Container */}
-                <div className="absolute inset-0 flex items-center justify-center p-1 md:p-4 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors"
-                >
+                <div className="absolute inset-0 flex items-center justify-center p-1 md:p-4 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors overflow-hidden">
                   <div 
-                    className="relative aspect-square h-full max-h-full max-w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden"
+                    className="relative flex items-center justify-center"
                     style={{ 
                       transform: `scale(${mapScale})`,
-                      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      maxWidth: '100%',
+                      maxHeight: '100%'
                     }}
                   >
-                    {/* Mock Floor Plan Background */}
-                    <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
+                    {/* SVG trick to maintain square aspect ratio that fits within parent */}
+                    <svg viewBox="0 0 1 1" className="w-[100vmax] max-w-full max-h-full opacity-0 pointer-events-none" />
                     
-                    {/* Floor Plan Image */}
-                    <div className="absolute inset-0">
-                      <img 
-                        src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
-                        alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
-                        className="w-full h-full object-cover opacity-80 dark:opacity-60 transition-opacity duration-500"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                    
-                    {/* Room Markers */}
-                    {filteredRoomsForMap.map((room) => {
+                    <div className="absolute inset-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden">
+                      {/* Mock Floor Plan Background */}
+                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
+                      
+                      {/* Floor Plan Image */}
+                      <div className="absolute inset-0">
+                        <img 
+                          src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
+                          alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
+                          className="w-full h-full object-cover opacity-80 dark:opacity-60 transition-opacity duration-500"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                      
+                      {/* Room Markers */}
+                      {filteredRoomsForMap.map((room) => {
                       const dynamicStatus = getDynamicRoomStatus(room.id, bookingDate, bookingStartTime);
                       const statusColor = dynamicStatus === 'Available' ? 'bg-emerald-500' : 
                                          dynamicStatus === 'Pending' ? 'bg-amber-500' : 'bg-rose-500';
@@ -2612,6 +2617,7 @@ export default function App() {
                         />
                       );
                     })}
+                    </div>
                   </div>
                 </div>
 
@@ -3333,7 +3339,7 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMark
   return (
     <button 
       onClick={onClick}
-      className="absolute group z-20"
+      className="absolute group z-20 -translate-x-1/2 -translate-y-1/2"
       style={{ top: room.top, left: room.left }}
     >
       <div className="flex flex-col items-center">
