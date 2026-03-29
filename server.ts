@@ -9,7 +9,7 @@ import * as ics from 'ics';
 import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import { translations, Language } from "./translations.js";
-import { get, put } from '@vercel/blob';
+import { put } from '@vercel/blob';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -136,10 +136,11 @@ async function initDatabase() {
           console.error("[DB] BLOB_READ_WRITE_TOKEN is missing. Cannot fetch database from Vercel Blob.");
         } else if (blobUrl && blobUrl.startsWith('http')) {
           console.log("[DB] Fetching database from Vercel Blob:", blobUrl);
-          const response = await get(blobUrl, { token: token as string });
-          // @vercel/blob get returns a Blob.
-          const blob = response as unknown as Blob;
-          const buffer = await blob.arrayBuffer();
+          const response = await fetch(blobUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch database: ${response.status} ${response.statusText}`);
+          }
+          const buffer = await response.arrayBuffer();
           fs.writeFileSync(dbPath, Buffer.from(buffer));
           console.log("[DB] Database downloaded to /tmp/salas.db");
         } else {
@@ -319,8 +320,13 @@ app.use(async (req, res, next) => {
     try {
       await initDatabase();
       dbInitialized = true;
-    } catch (err) {
-      return res.status(500).json({ error: "Database initialization failed" });
+    } catch (err: any) {
+      console.error("[DB] Initialization error:", err);
+      return res.status(500).json({ 
+        error: "Database initialization failed", 
+        details: err.message,
+        stack: IS_VERCEL ? undefined : err.stack
+      });
     }
   }
   next();
