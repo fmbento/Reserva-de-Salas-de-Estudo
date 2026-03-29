@@ -9,6 +9,7 @@ import * as ics from 'ics';
 import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
 import { translations, Language } from "./src/translations.ts";
+import { get, put } from '@vercel/blob';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,14 +29,105 @@ if (!fs.existsSync(dataDir)) {
 }
 
 let db: any;
-try {
-  const dbPath = path.join(dataDir, "salas.db");
-  db = new Database(dbPath); 
-  db.pragma('foreign_keys = ON');
-  console.log(`[DB] Database initialized successfully at: ${path.resolve(dbPath)}`);
-} catch (error) {
-  console.error("[DB] Failed to initialize database:", error);
-  process.exit(1);
+const DEPLOY_TO = process.env.DEPLOY_TO || 'docker';
+
+async function initDatabase() {
+  const dbPath = DEPLOY_TO === 'vercel' 
+    ? path.join('/tmp', 'salas.db') 
+    : path.join(dataDir, "salas.db");
+
+  if (DEPLOY_TO === 'vercel') {
+    try {
+      console.log("[DB] Fetching database from Vercel Blob...");
+      const blobUrl = process.env.DATABASE_BLOB_URL || 'data/salas.db';
+      const response = await get(blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN, access: 'public' } as any) as any;
+      const buffer = await response.blob.arrayBuffer();
+      fs.writeFileSync(dbPath, Buffer.from(buffer));
+      console.log("[DB] Database downloaded to /tmp/salas.db");
+    } catch (error) {
+      console.error("[DB] Failed to fetch database from Vercel Blob:", error);
+      // If it fails, we'll try to use the local one or create a new one in /tmp
+    }
+  }
+
+  try {
+    db = new Database(dbPath); 
+    db.pragma('foreign_keys = ON');
+    console.log(`[DB] Database initialized successfully at: ${path.resolve(dbPath)}`);
+  } catch (error) {
+    console.error("[DB] Failed to initialize database:", error);
+    process.exit(1);
+  }
+
+  // Initialize database tables
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        role TEXT DEFAULT 'user'
+      );
+
+      CREATE TABLE IF NOT EXISTS rooms (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        building TEXT NOT NULL,
+        floor TEXT NOT NULL,
+        section TEXT NOT NULL,
+        department TEXT NOT NULL,
+        status TEXT NOT NULL,
+        capacity INTEGER,
+        top TEXT,
+        left TEXT,
+        operational_status TEXT DEFAULT 'Active',
+        image TEXT,
+        amenities TEXT DEFAULT '[]'
+      );
+
+      CREATE TABLE IF NOT EXISTS reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        duration INTEGER NOT NULL,
+        subject TEXT NOT NULL,
+        status TEXT DEFAULT 'Pending',
+        FOREIGN KEY (room_id) REFERENCES rooms(id),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS otps (
+        email TEXT PRIMARY KEY,
+        code TEXT NOT NULL,
+        name TEXT,
+        expires_at DATETIME NOT NULL
+      );
+    `);
+    console.log("[DB] Tables initialized successfully");
+  } catch (error) {
+    console.error("[DB] Failed to initialize tables:", error);
+    process.exit(1);
+  }
+}
+
+// Helper to sync database back to Vercel Blob
+async function syncDatabase() {
+  if (DEPLOY_TO !== 'vercel') return;
+  
+  try {
+    const dbPath = path.join('/tmp', 'salas.db');
+    const fileBuffer = fs.readFileSync(dbPath);
+    await put('data/salas.db', fileBuffer, { 
+      access: 'public', 
+      addRandomSuffix: false,
+      token: process.env.BLOB_READ_WRITE_TOKEN
+    });
+    console.log("[DB] Database synced back to Vercel Blob");
+  } catch (error) {
+    console.error("[DB] Failed to sync database to Vercel Blob:", error);
+  }
 }
 
 // Load maps from maps.txt
@@ -422,6 +514,7 @@ async function sendOtpEmail(email: string, code: string, lang: Language = 'pt') 
 }
 
 async function startServer() {
+  await initDatabase();
   const app = express();
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server });
@@ -479,6 +572,7 @@ async function startServer() {
         INSERT OR REPLACE INTO otps (email, code, name, expires_at)
         VALUES (?, ?, ?, ?)
       `).run(email, code, name || null, expiresAt);
+      await syncDatabase();
 
       const emailSent = await sendOtpEmail(email, code, userLang);
       res.json({ 
@@ -496,7 +590,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/auth/verify-otp", (req, res) => {
+  app.post("/api/auth/verify-otp", async (req, res) => {
     const { email, code, lang } = req.body;
     const userLang = (lang as Language) || 'pt';
     const t = translations[userLang];
@@ -526,12 +620,14 @@ async function startServer() {
 
     if (!user) {
       const result = db.prepare("INSERT INTO users (name, email, role) VALUES (?, ?, 'user')").run(otpRecord.name || "Utilizador UA", email);
+      await syncDatabase();
       user = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
       isNewUser = true;
     }
 
     // Clean up OTP
     db.prepare("DELETE FROM otps WHERE email = ?").run(email);
+    await syncDatabase();
 
     if (isNewUser && user) {
       sendWelcomeEmail(user.email, user.name, lang).catch(console.error);
@@ -557,7 +653,7 @@ async function startServer() {
     res.json(reservations);
   });
 
-  app.post("/api/reservations", (req, res) => {
+  app.post("/api/reservations", async (req, res) => {
     const { room_id, user_id, date, start_time, duration, subject, lang } = req.body;
     const userLang = (lang as Language) || 'pt';
     const t = translations[userLang];
@@ -627,6 +723,7 @@ async function startServer() {
         INSERT INTO reservations (room_id, user_id, date, start_time, duration, subject, status) 
         VALUES (?, ?, ?, ?, ?, ?, 'Pending')
       `).run(room_id, uid, date, start_time, duration, subject || 'Sem assunto');
+      await syncDatabase();
       
       const newReservation = db.prepare("SELECT * FROM reservations WHERE id = ?").get(result.lastInsertRowid);
       
@@ -648,7 +745,7 @@ async function startServer() {
     }
   });
 
-  app.delete("/api/reservations/:id", (req, res) => {
+  app.delete("/api/reservations/:id", async (req, res) => {
     const { id } = req.params;
     const lang = (req.query.lang as Language) || 'pt';
     try {
@@ -666,6 +763,7 @@ async function startServer() {
       }
 
       db.prepare("DELETE FROM reservations WHERE id = ?").run(id);
+      await syncDatabase();
       broadcast({ type: 'RESERVATIONS_UPDATED' });
       res.status(204).send();
     } catch (error) {
@@ -708,7 +806,7 @@ async function startServer() {
     res.json(user);
   });
 
-  app.put("/api/users/:id/role", (req, res) => {
+  app.put("/api/users/:id/role", async (req, res) => {
     const { id } = req.params;
     const { role, lang } = req.body;
     const userLang = (lang as Language) || 'pt';
@@ -720,6 +818,7 @@ async function startServer() {
 
     try {
       db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, id);
+      await syncDatabase();
       broadcast({ type: 'USERS_UPDATED' });
       res.json({ success: true, message: t.userUpdatedSuccess });
     } catch (error: any) {
@@ -728,7 +827,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/rooms", (req, res) => {
+  app.post("/api/rooms", async (req, res) => {
     const { 
       id, name, building, floor, section, top, left, 
       department, capacity, operationalStatus, operational_status, image, amenities, lang 
@@ -768,6 +867,7 @@ async function startServer() {
         image || '',
         JSON.stringify(amenities || [])
       );
+      await syncDatabase();
 
       const newRoom = db.prepare("SELECT * FROM rooms WHERE id = ?").get(id);
       broadcast({ type: 'ROOMS_UPDATED' });
@@ -778,7 +878,7 @@ async function startServer() {
     }
   });
 
-  app.put("/api/rooms/:id", (req, res) => {
+  app.put("/api/rooms/:id", async (req, res) => {
     const { id } = req.params;
     const { 
       name, building, floor, section, top, left, 
@@ -811,6 +911,7 @@ async function startServer() {
       );
       
       if (result.changes > 0) {
+        await syncDatabase();
         broadcast({ type: 'ROOMS_UPDATED' });
         res.json({ success: true });
       } else {
@@ -826,13 +927,14 @@ async function startServer() {
     }
   });
 
-  app.patch("/api/reservations/:id/status", (req, res) => {
+  app.patch("/api/reservations/:id/status", async (req, res) => {
     const { id } = req.params;
     const { status, lang } = req.body;
     const userLang = (lang as Language) || 'pt';
     const t = translations[userLang];
     try {
       db.prepare("UPDATE reservations SET status = ? WHERE id = ?").run(status, id);
+      await syncDatabase();
       
       // Send notification
       const reservation = db.prepare(`

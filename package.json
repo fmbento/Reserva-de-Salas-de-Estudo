@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@google/genai": "latest",
+    "@vercel/blob": "^2.3.2",
     "better-sqlite3": "^12.6.2",
     "clsx": "latest",
     "d3": "latest",
