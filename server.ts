@@ -30,6 +30,7 @@ if (!fs.existsSync(dataDir)) {
 
 // Seed initial data
 const seedData = () => {
+  if (!db) return;
   const adminEmail = process.env.ADMIN_EMAIL || "sbidm-biblioteca@ua.pt";
   const users = [
     { name: "Utilizador Teste 1", email: "teste01@ua.pt", role: "user" },
@@ -38,7 +39,7 @@ const seedData = () => {
     { name: "Administrador do Sistema 01", email: adminEmail, role: "admin" },
   ];
 
-  console.log("Seeding users...");
+  console.log("[DB] Seeding users...");
   const insertUser = db.prepare(`
     INSERT INTO users (name, email, role) 
     VALUES (?, ?, ?)
@@ -50,14 +51,11 @@ const seedData = () => {
     insertUser.run(u.name, u.email, u.role);
   });
 
-  const allUsersInDb = db.prepare("SELECT * FROM users").all();
-  console.log("All users in DB:", allUsersInDb);
-  
   const u1 = db.prepare("SELECT id FROM users WHERE email = ?").get("teste01@ua.pt") as { id: number } | undefined;
   const u2 = db.prepare("SELECT id FROM users WHERE email = ?").get("teste02@ua.pt") as { id: number } | undefined;
 
   if (!u1 || !u2) {
-    console.error("Critical error: Seed users not found after insertion.");
+    console.error("[DB] Critical error: Seed users not found after insertion.");
     return;
   }
 
@@ -116,152 +114,105 @@ const seedData = () => {
 };
 
 let db: any;
+let initPromise: Promise<void> | null = null;
 const DEPLOY_TO = process.env.DEPLOY_TO || 'docker';
 
 async function initDatabase() {
-  if (db) return; // Already initialized
+  if (db) return;
+  if (initPromise) return initPromise;
 
-  const dbPath = DEPLOY_TO === 'vercel' 
-    ? path.join('/tmp', 'salas.db') 
-    : path.join(dataDir, "salas.db");
+  initPromise = (async () => {
+    const dbPath = DEPLOY_TO === 'vercel' 
+      ? path.join('/tmp', 'salas.db') 
+      : path.join(dataDir, "salas.db");
 
-  if (DEPLOY_TO === 'vercel') {
-    try {
-      console.log("[DB] Fetching database from Vercel Blob...");
-      const blobUrl = process.env.DATABASE_BLOB_URL || 'data/salas.db';
-      const response = await get(blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN, access: 'public' } as any) as any;
-      const buffer = await response.blob.arrayBuffer();
-      fs.writeFileSync(dbPath, Buffer.from(buffer));
-      console.log("[DB] Database downloaded to /tmp/salas.db");
-    } catch (error) {
-      console.error("[DB] Failed to fetch database from Vercel Blob:", error);
-      // If it fails, we'll try to use the local one or create a new one in /tmp
+    if (DEPLOY_TO === 'vercel') {
+      try {
+        const blobUrl = process.env.DATABASE_BLOB_URL;
+        if (blobUrl && blobUrl.startsWith('http')) {
+          console.log("[DB] Fetching database from Vercel Blob:", blobUrl);
+          const response = await get(blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN });
+          // @vercel/blob get returns a Blob.
+          const blob = response as unknown as Blob;
+          const buffer = await blob.arrayBuffer();
+          fs.writeFileSync(dbPath, Buffer.from(buffer));
+          console.log("[DB] Database downloaded to /tmp/salas.db");
+        } else {
+          console.warn("[DB] DATABASE_BLOB_URL is missing or invalid. Starting with a fresh database.");
+        }
+      } catch (error) {
+        console.error("[DB] Failed to fetch database from Vercel Blob:", error);
+      }
     }
-  }
 
-  try {
-    db = new Database(dbPath); 
-    db.pragma('foreign_keys = ON');
-    
-    // Ensure tables exist
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        role TEXT DEFAULT 'user'
-      );
-      CREATE TABLE IF NOT EXISTS rooms (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        building TEXT,
-        floor TEXT,
-        section TEXT,
-        department TEXT NOT NULL,
-        status TEXT NOT NULL,
-        capacity INTEGER,
-        description TEXT,
-        operational_status TEXT DEFAULT 'Active',
-        image TEXT,
-        amenities TEXT DEFAULT '[]',
-        top TEXT,
-        left TEXT
-      );
-      CREATE TABLE IF NOT EXISTS reservations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        room_id TEXT NOT NULL,
-        user_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        start_time TEXT NOT NULL,
-        duration INTEGER NOT NULL,
-        subject TEXT NOT NULL,
-        status TEXT DEFAULT 'Pending',
-        FOREIGN KEY (room_id) REFERENCES rooms(id),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-      );
-      CREATE TABLE IF NOT EXISTS otps (
-        email TEXT PRIMARY KEY,
-        code TEXT NOT NULL,
-        name TEXT,
-        expires_at DATETIME NOT NULL
-      );
-    `);
+    try {
+      db = new Database(dbPath); 
+      db.pragma('foreign_keys = ON');
+      
+      // Ensure tables exist
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          email TEXT UNIQUE NOT NULL,
+          role TEXT DEFAULT 'user'
+        );
+        CREATE TABLE IF NOT EXISTS rooms (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          building TEXT DEFAULT '',
+          floor TEXT DEFAULT '',
+          section TEXT DEFAULT '',
+          department TEXT NOT NULL,
+          status TEXT NOT NULL,
+          capacity INTEGER,
+          description TEXT,
+          operational_status TEXT DEFAULT 'Active',
+          image TEXT,
+          amenities TEXT DEFAULT '[]',
+          top TEXT,
+          left TEXT
+        );
+        CREATE TABLE IF NOT EXISTS reservations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          room_id TEXT NOT NULL,
+          user_id INTEGER NOT NULL,
+          date TEXT NOT NULL,
+          start_time TEXT NOT NULL,
+          duration INTEGER NOT NULL,
+          subject TEXT NOT NULL,
+          status TEXT DEFAULT 'Pending',
+          FOREIGN KEY (room_id) REFERENCES rooms(id),
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+        CREATE TABLE IF NOT EXISTS otps (
+          email TEXT PRIMARY KEY,
+          code TEXT NOT NULL,
+          name TEXT,
+          expires_at DATETIME NOT NULL
+        );
+      `);
 
-    seedData();
-    console.log(`[DB] Database initialized and seeded successfully at: ${path.resolve(dbPath)}`);
-  } catch (error) {
-    console.error("[DB] Failed to initialize database:", error);
-    throw error;
-  }
+      // Migrations
+      try { db.exec("ALTER TABLE rooms ADD COLUMN operational_status TEXT DEFAULT 'Active'"); } catch(e) {}
+      try { db.exec("ALTER TABLE rooms ADD COLUMN image TEXT"); } catch(e) {}
+      try { db.exec("ALTER TABLE rooms ADD COLUMN amenities TEXT DEFAULT '[]'"); } catch(e) {}
+      try { db.exec("ALTER TABLE rooms ADD COLUMN building TEXT DEFAULT ''"); } catch(e) {}
+      try { db.exec("ALTER TABLE rooms ADD COLUMN floor TEXT DEFAULT ''"); } catch(e) {}
+      try { db.exec("ALTER TABLE rooms ADD COLUMN section TEXT DEFAULT ''"); } catch(e) {}
+      try { db.exec("ALTER TABLE rooms ADD COLUMN top TEXT"); } catch(e) {}
+      try { db.exec("ALTER TABLE rooms ADD COLUMN left TEXT"); } catch(e) {}
 
-  // Initialize database tables
-  try {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        role TEXT DEFAULT 'user'
-      );
+      seedData();
+      console.log(`[DB] Database initialized and seeded successfully at: ${path.resolve(dbPath)}`);
+    } catch (error) {
+      console.error("[DB] Failed to initialize database:", error);
+      initPromise = null;
+      throw error;
+    }
+  })();
 
-      CREATE TABLE IF NOT EXISTS rooms (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        building TEXT NOT NULL,
-        floor TEXT NOT NULL,
-        section TEXT NOT NULL,
-        department TEXT NOT NULL,
-        status TEXT NOT NULL,
-        capacity INTEGER,
-        description TEXT,
-        operational_status TEXT DEFAULT 'Active',
-        image TEXT,
-        amenities TEXT DEFAULT '[]',
-        top TEXT,
-        left TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS reservations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        room_id TEXT NOT NULL,
-        user_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        start_time TEXT NOT NULL,
-        duration INTEGER NOT NULL,
-        subject TEXT NOT NULL,
-        status TEXT DEFAULT 'Pending',
-        FOREIGN KEY (room_id) REFERENCES rooms(id),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS otps (
-        email TEXT PRIMARY KEY,
-        code TEXT NOT NULL,
-        name TEXT,
-        expires_at DATETIME NOT NULL
-      );
-    `);
-    
-    // Migrations
-    try { db.exec("ALTER TABLE rooms ADD COLUMN operational_status TEXT DEFAULT 'Active'"); } catch(e) {}
-    try { db.exec("ALTER TABLE rooms ADD COLUMN image TEXT"); } catch(e) {}
-    try { db.exec("ALTER TABLE rooms ADD COLUMN amenities TEXT DEFAULT '[]'"); } catch(e) {}
-    try { db.exec("ALTER TABLE rooms ADD COLUMN building TEXT DEFAULT ''"); } catch(e) {}
-    try { db.exec("ALTER TABLE rooms ADD COLUMN floor TEXT DEFAULT ''"); } catch(e) {}
-    try { db.exec("ALTER TABLE rooms ADD COLUMN section TEXT DEFAULT ''"); } catch(e) {}
-    try { db.exec("ALTER TABLE rooms ADD COLUMN top TEXT DEFAULT ''"); } catch(e) {}
-    try { db.exec("ALTER TABLE rooms ADD COLUMN left TEXT DEFAULT ''"); } catch(e) {}
-    try { db.exec("ALTER TABLE rooms ADD COLUMN description TEXT"); } catch(e) {}
-
-    console.log("[DB] Tables initialized successfully");
-    
-    // Seed data
-    seedData();
-    console.log("[DB] Database seeded successfully");
-  } catch (error) {
-    console.error("[DB] Failed to initialize tables or seed data:", error);
-    throw error;
-  }
+  return initPromise;
 }
 
 // Helper to sync database back to Vercel Blob
@@ -271,12 +222,12 @@ async function syncDatabase() {
   try {
     const dbPath = path.join('/tmp', 'salas.db');
     const fileBuffer = fs.readFileSync(dbPath);
-    await put('data/salas.db', fileBuffer, { 
+    const blob = await put('data/salas.db', fileBuffer, { 
       access: 'public', 
       addRandomSuffix: false,
       token: process.env.BLOB_READ_WRITE_TOKEN
     });
-    console.log("[DB] Database synced back to Vercel Blob");
+    console.log("[DB] Database synced back to Vercel Blob:", blob.url);
   } catch (error) {
     console.error("[DB] Failed to sync database to Vercel Blob:", error);
   }
@@ -326,14 +277,25 @@ if (fs.existsSync(mapsPath)) {
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+let wss: WebSocketServer | null = null;
+
+if (!process.env.VERCEL) {
+  wss = new WebSocketServer({ server });
+  
+  wss.on("connection", (ws) => {
+    console.log("Client connected via WebSocket");
+    ws.on("close", () => console.log("Client disconnected"));
+  });
+}
 
 const broadcast = (data: any) => {
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(data));
-    }
-  });
+  if (wss) {
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(data));
+      }
+    });
+  }
 };
 
 app.use(express.json());
@@ -437,7 +399,7 @@ app.get("/api/maps", (req, res) => {
     let isNewUser = false;
 
     if (!user) {
-      const result = db.prepare("INSERT INTO users (name, email, role) VALUES (?, ?, 'user')").run(otpRecord.name || "Utilizador UA", email);
+      const result = db.prepare("INSERT INTO users (name, email, role) VALUES (?, ?, 'user')").run(otpRecord.name || email.split('@')[0], email);
       await syncDatabase();
       user = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
       isNewUser = true;
