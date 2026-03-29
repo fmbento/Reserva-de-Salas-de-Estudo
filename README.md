@@ -77,8 +77,21 @@ This application is optimized for Vercel deployment using **Vercel Blob Storage*
 
 - `DEPLOY_TO=vercel`
 - `BLOB_READ_WRITE_TOKEN`: Automatically provided by Vercel when Blob is enabled.
+- `DATABASE_BLOB_URL`: URL to your `salas.db` file in Vercel Blob storage (optional, for initial fetch).
 - `ADMIN_EMAIL`: Your admin email.
-- `SMTP_*`: Your email configuration variables.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`: Email configuration.
+
+### ⚠️ Vercel Troubleshooting (500 Internal Server Error)
+
+If you encounter a `500: INTERNAL_SERVER_ERROR` or `FUNCTION_INVOCATION_FAILED` on Vercel:
+
+1. **Check Environment Variables**: Ensure all `SMTP_*` and `ADMIN_EMAIL` variables are correctly set in the Vercel Dashboard.
+2. **Vercel Blob Token**: Verify that `BLOB_READ_WRITE_TOKEN` is present in your environment variables. It should be added automatically when you enable Vercel Blob.
+3. **Database Initialization**: The first request might take longer as it downloads the database from Vercel Blob. If it times out, try refreshing.
+4. **Native Modules**: `better-sqlite3` is a native module. If deployment fails, ensure your Node.js version in Vercel matches your local environment (recommended: Node 20.x).
+5. **Logs**: Check the **Logs** tab in your Vercel deployment to see the specific error message.
+
+**Note:** WebSockets are automatically disabled when running on Vercel to maintain compatibility with serverless functions.
 
 ---
 
@@ -220,13 +233,18 @@ CREATE TABLE users (
 CREATE TABLE rooms (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  building TEXT DEFAULT '',
+  floor TEXT DEFAULT '',
+  section TEXT DEFAULT '',
   department TEXT NOT NULL,
   status TEXT NOT NULL,
   capacity INTEGER,
   description TEXT,
   operational_status TEXT DEFAULT 'Active',
   image TEXT,
-  amenities TEXT DEFAULT '[]'
+  amenities TEXT DEFAULT '[]',
+  top TEXT,
+  left TEXT
 );
 ```
 
@@ -405,6 +423,22 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.4.2 (March 29, 2026)
+- **TypeScript Fixes**: Resolved build errors on Vercel related to `@vercel/blob` type safety.
+- **Improved Syncing**: Added token validation before attempting to sync the database back to Vercel Blob.
+
+### Version 0.4.1 (March 29, 2026)
+- **Vercel Troubleshooting**: Added detailed troubleshooting steps for common Vercel deployment issues (500 errors).
+- **Environment Documentation**: Expanded documentation for required environment variables on Vercel.
+- **Robustness**: Improved server-side checks for Vercel environment to prevent unnecessary file watching.
+
+### Version 0.4.0 (March 29, 2026)
+- **Vercel Deployment Compatibility**: Refactored the backend to support Vercel's serverless environment.
+- **Database Persistence**: Integrated **Vercel Blob Storage** for SQLite persistence, allowing the database to survive serverless function restarts.
+- **WebSocket Fallback**: Implemented conditional WebSocket initialization to prevent crashes on serverless platforms.
+- **Improved Initialization**: Added concurrency control for database initialization to handle multiple simultaneous requests during cold starts.
+- **User Registration Fix**: Added default name generation from email prefix when no name is provided during OTP verification.
+
 ### Version 0.3.3 (March 27, 2026)
 - **Room Creation**: Implemented "Add New Room" functionality in the Backoffice with a dedicated `POST /api/rooms` endpoint.
 - **Improved Validation**: Added server-side validation for room IDs to prevent duplicates and ensure data integrity.
@@ -446,7 +480,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** March 27, 2026
+**Last Updated:** March 29, 2026
 ```
 
 This README provides:

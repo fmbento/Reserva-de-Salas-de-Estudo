@@ -129,9 +129,13 @@ async function initDatabase() {
     if (DEPLOY_TO === 'vercel') {
       try {
         const blobUrl = process.env.DATABASE_BLOB_URL;
-        if (blobUrl && blobUrl.startsWith('http')) {
+        const token = process.env.BLOB_READ_WRITE_TOKEN;
+        
+        if (!token) {
+          console.error("[DB] BLOB_READ_WRITE_TOKEN is missing. Cannot fetch database from Vercel Blob.");
+        } else if (blobUrl && blobUrl.startsWith('http')) {
           console.log("[DB] Fetching database from Vercel Blob:", blobUrl);
-          const response = await get(blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN });
+          const response = await get(blobUrl, { token: token as string, access: 'public' });
           // @vercel/blob get returns a Blob.
           const blob = response as unknown as Blob;
           const buffer = await blob.arrayBuffer();
@@ -146,7 +150,8 @@ async function initDatabase() {
     }
 
     try {
-      db = new Database(dbPath); 
+      console.log(`[DB] Opening database at: ${dbPath}`);
+      db = new Database(dbPath, { verbose: console.log }); 
       db.pragma('foreign_keys = ON');
       
       // Ensure tables exist
@@ -219,13 +224,19 @@ async function initDatabase() {
 async function syncDatabase() {
   if (DEPLOY_TO !== 'vercel') return;
   
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    console.error("[DB] BLOB_READ_WRITE_TOKEN is missing. Cannot sync database back to Vercel Blob.");
+    return;
+  }
+  
   try {
     const dbPath = path.join('/tmp', 'salas.db');
     const fileBuffer = fs.readFileSync(dbPath);
     const blob = await put('data/salas.db', fileBuffer, { 
       access: 'public', 
       addRandomSuffix: false,
-      token: process.env.BLOB_READ_WRITE_TOKEN
+      token: token
     });
     console.log("[DB] Database synced back to Vercel Blob:", blob.url);
   } catch (error) {
@@ -265,8 +276,8 @@ function loadMaps() {
 
 loadMaps();
 
-// Watch for changes in maps.txt
-if (fs.existsSync(mapsPath)) {
+// Watch for changes in maps.txt (disabled on Vercel)
+if (fs.existsSync(mapsPath) && !process.env.VERCEL) {
   fs.watch(mapsPath, (eventType) => {
     if (eventType === "change") {
       console.log("[MAPS] maps.txt changed, reloading...");
