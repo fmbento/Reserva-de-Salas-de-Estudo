@@ -2573,50 +2573,46 @@ export default function App() {
                 {/* Map Container */}
                 <div className="absolute inset-0 flex items-center justify-center p-1 md:p-4 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors overflow-hidden">
                   <div 
-                    className="relative flex items-center justify-center"
+                    className="relative flex items-center justify-center max-w-full max-h-full"
                     style={{ 
                       transform: `scale(${mapScale})`,
                       transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      maxWidth: '100%',
-                      maxHeight: '100%'
                     }}
                   >
-                    {/* SVG trick to maintain square aspect ratio that fits within parent */}
-                    <svg viewBox="0 0 1 1" className="w-[100vmax] max-w-full max-h-full opacity-0 pointer-events-none" />
-                    
-                    <div className="absolute inset-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden">
+                    <div className="relative inline-block max-w-full max-h-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden">
                       {/* Mock Floor Plan Background */}
-                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px]" />
+                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
                       
                       {/* Floor Plan Image */}
-                      <div className="absolute inset-0">
-                        <img 
-                          src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
-                          alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
-                          className="w-full h-full object-cover opacity-80 dark:opacity-60 transition-opacity duration-500"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
+                      <img 
+                        src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
+                        alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
+                        className="max-w-full max-h-full object-contain opacity-80 dark:opacity-60 transition-opacity duration-500 block"
+                        style={{ maxHeight: 'calc(100vh - 200px)' }}
+                        referrerPolicy="no-referrer"
+                      />
                       
                       {/* Room Markers */}
-                      {filteredRoomsForMap.map((room) => {
-                      const dynamicStatus = getDynamicRoomStatus(room.id, bookingDate, bookingStartTime);
-                      const statusColor = dynamicStatus === 'Available' ? 'bg-emerald-500' : 
-                                         dynamicStatus === 'Pending' ? 'bg-amber-500' : 'bg-rose-500';
-                      return (
-                        <RoomMarker 
-                          key={room.id} 
-                          room={room} 
-                          isSelected={selectedRoomId === room.id}
-                          onClick={() => {
-                            setSelectedRoomId(room.id);
-                            setMobileShowDetails(true);
-                          }}
-                          statusColor={statusColor}
-                          status={dynamicStatus}
-                        />
-                      );
-                    })}
+                      <div className="absolute inset-0">
+                        {filteredRoomsForMap.map((room) => {
+                        const dynamicStatus = getDynamicRoomStatus(room.id, bookingDate, bookingStartTime);
+                        const statusColor = dynamicStatus === 'Available' ? 'bg-emerald-500' : 
+                                           dynamicStatus === 'Pending' ? 'bg-amber-500' : 'bg-rose-500';
+                        return (
+                          <RoomMarker 
+                            key={room.id} 
+                            room={room} 
+                            isSelected={selectedRoomId === room.id}
+                            onClick={() => {
+                              setSelectedRoomId(room.id);
+                              setMobileShowDetails(true);
+                            }}
+                            statusColor={statusColor}
+                            status={dynamicStatus}
+                          />
+                        );
+                      })}
+                      </div>
                     </div>
                   </div>
                 </div>
