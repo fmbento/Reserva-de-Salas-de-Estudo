@@ -8,7 +8,7 @@ import nodemailer from "nodemailer";
 import * as ics from 'ics';
 import { WebSocketServer, WebSocket } from "ws";
 import http from "http";
-import { translations, Language } from "./src/translations.ts";
+import { translations, Language } from "./translations.js";
 import { get, put } from '@vercel/blob';
 
 const __filename = fileURLToPath(import.meta.url);

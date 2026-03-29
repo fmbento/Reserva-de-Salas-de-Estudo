@@ -423,6 +423,9 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.4.4 (March 29, 2026)
+- **Vercel Module Resolution Fix**: Moved `translations.ts` to the project root and updated imports to use the `.js` extension. This ensures compatibility with Node.js ESM in Vercel's serverless environment, where `.ts` files are compiled to `.js` and standard Node.js module resolution is enforced.
+
 ### Version 0.4.3 (March 29, 2026)
 - **MIME Type Fix**: Updated `vercel.json` with `handle: filesystem` to ensure static assets are served correctly by Vercel's edge network, preventing MIME type errors for module scripts.
 - **Path Resolution**: Switched to `process.cwd()` for `dist` path resolution in `server.ts` for better Vercel compatibility.

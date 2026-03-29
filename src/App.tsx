@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cookies from 'js-cookie';
-import { translations, Language } from './translations';
+import { translations, Language } from '../translations';
 
 type RoomStatus = 'Available' | 'Pending' | 'Occupied';
 type OperationalStatus = 'Active' | 'Maintenance' | 'Inactive';
