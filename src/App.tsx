@@ -264,7 +264,7 @@ const Login = ({
 
         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center overflow-hidden mb-6 shadow-sm border border-slate-100 dark:border-slate-800">
           <img 
-            src="http://salina.web.ua.pt/ua.png" 
+            src="https://salina.web.ua.pt/ua.png" 
             alt="UA Logo" 
             className="w-10 h-10 object-contain"
             referrerPolicy="no-referrer"
@@ -2280,7 +2280,7 @@ export default function App() {
           <div className="flex items-center gap-2 text-[#0066cc]">
             <div className="bg-white p-1 rounded-lg shadow-sm border border-slate-100 dark:border-slate-800">
               <img 
-                src="http://salina.web.ua.pt/ua.png" 
+                src="https://salina.web.ua.pt/ua.png" 
                 alt="UA Logo" 
                 className="h-6 w-6 md:h-7 md:w-7 object-contain"
                 referrerPolicy="no-referrer"

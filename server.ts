@@ -28,212 +28,6 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-let db: any;
-const DEPLOY_TO = process.env.DEPLOY_TO || 'docker';
-
-async function initDatabase() {
-  const dbPath = DEPLOY_TO === 'vercel' 
-    ? path.join('/tmp', 'salas.db') 
-    : path.join(dataDir, "salas.db");
-
-  if (DEPLOY_TO === 'vercel') {
-    try {
-      console.log("[DB] Fetching database from Vercel Blob...");
-      const blobUrl = process.env.DATABASE_BLOB_URL || 'data/salas.db';
-      const response = await get(blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN, access: 'public' } as any) as any;
-      const buffer = await response.blob.arrayBuffer();
-      fs.writeFileSync(dbPath, Buffer.from(buffer));
-      console.log("[DB] Database downloaded to /tmp/salas.db");
-    } catch (error) {
-      console.error("[DB] Failed to fetch database from Vercel Blob:", error);
-      // If it fails, we'll try to use the local one or create a new one in /tmp
-    }
-  }
-
-  try {
-    db = new Database(dbPath); 
-    db.pragma('foreign_keys = ON');
-    console.log(`[DB] Database initialized successfully at: ${path.resolve(dbPath)}`);
-  } catch (error) {
-    console.error("[DB] Failed to initialize database:", error);
-    process.exit(1);
-  }
-
-  // Initialize database tables
-  try {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        role TEXT DEFAULT 'user'
-      );
-
-      CREATE TABLE IF NOT EXISTS rooms (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        building TEXT NOT NULL,
-        floor TEXT NOT NULL,
-        section TEXT NOT NULL,
-        department TEXT NOT NULL,
-        status TEXT NOT NULL,
-        capacity INTEGER,
-        top TEXT,
-        left TEXT,
-        operational_status TEXT DEFAULT 'Active',
-        image TEXT,
-        amenities TEXT DEFAULT '[]'
-      );
-
-      CREATE TABLE IF NOT EXISTS reservations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        room_id TEXT NOT NULL,
-        user_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        start_time TEXT NOT NULL,
-        duration INTEGER NOT NULL,
-        subject TEXT NOT NULL,
-        status TEXT DEFAULT 'Pending',
-        FOREIGN KEY (room_id) REFERENCES rooms(id),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS otps (
-        email TEXT PRIMARY KEY,
-        code TEXT NOT NULL,
-        name TEXT,
-        expires_at DATETIME NOT NULL
-      );
-    `);
-    console.log("[DB] Tables initialized successfully");
-  } catch (error) {
-    console.error("[DB] Failed to initialize tables:", error);
-    process.exit(1);
-  }
-}
-
-// Helper to sync database back to Vercel Blob
-async function syncDatabase() {
-  if (DEPLOY_TO !== 'vercel') return;
-  
-  try {
-    const dbPath = path.join('/tmp', 'salas.db');
-    const fileBuffer = fs.readFileSync(dbPath);
-    await put('data/salas.db', fileBuffer, { 
-      access: 'public', 
-      addRandomSuffix: false,
-      token: process.env.BLOB_READ_WRITE_TOKEN
-    });
-    console.log("[DB] Database synced back to Vercel Blob");
-  } catch (error) {
-    console.error("[DB] Failed to sync database to Vercel Blob:", error);
-  }
-}
-
-// Load maps from maps.txt
-const mapsPath = path.join(dataDir, "maps.txt");
-let floorPlanMaps: Record<string, string> = {};
-
-function loadMaps() {
-  try {
-    if (fs.existsSync(mapsPath)) {
-      const content = fs.readFileSync(mapsPath, "utf-8");
-      const lines = content.split("\n");
-      const newMaps: Record<string, string> = {};
-      lines.forEach(line => {
-        const parts = line.split(":");
-        if (parts.length >= 2) {
-          const key = parts[0].trim();
-          const value = parts.slice(1).join(":").trim();
-          if (key && value) {
-            newMaps[key] = value;
-          }
-        }
-      });
-      floorPlanMaps = newMaps;
-      console.log(`[MAPS] Loaded ${Object.keys(floorPlanMaps).length} floor plans from maps.txt`);
-    } else {
-      console.warn(`[MAPS] maps.txt not found at ${mapsPath}`);
-    }
-  } catch (error) {
-    console.error("[MAPS] Failed to load maps.txt:", error);
-  }
-}
-
-loadMaps();
-
-// Watch for changes in maps.txt
-if (fs.existsSync(mapsPath)) {
-  fs.watch(mapsPath, (eventType) => {
-    if (eventType === "change") {
-      console.log("[MAPS] maps.txt changed, reloading...");
-      loadMaps();
-    }
-  });
-}
-
-// Initialize database tables
-try {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      role TEXT DEFAULT 'user'
-    );
-
-    CREATE TABLE IF NOT EXISTS rooms (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      building TEXT NOT NULL,
-      floor TEXT NOT NULL,
-      section TEXT NOT NULL,
-      department TEXT NOT NULL,
-      status TEXT NOT NULL,
-      capacity INTEGER,
-      description TEXT,
-      operational_status TEXT DEFAULT 'Active',
-      image TEXT,
-      amenities TEXT DEFAULT '[]',
-      top TEXT,
-      left TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS reservations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      room_id TEXT NOT NULL,
-      user_id INTEGER NOT NULL,
-      date TEXT NOT NULL,
-      start_time TEXT NOT NULL,
-      duration INTEGER NOT NULL,
-      subject TEXT NOT NULL,
-      status TEXT DEFAULT 'Pending',
-      FOREIGN KEY (room_id) REFERENCES rooms(id),
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS otps (
-      email TEXT PRIMARY KEY,
-      code TEXT NOT NULL,
-      name TEXT,
-      expires_at DATETIME NOT NULL
-    );
-  `);
-  console.log("Database tables verified/created successfully");
-} catch (error) {
-  console.error("CRITICAL: Failed to create database tables:", error);
-  process.exit(1);
-}
-
-try { db.exec("ALTER TABLE rooms ADD COLUMN operational_status TEXT DEFAULT 'Active'"); } catch(e) {}
-try { db.exec("ALTER TABLE rooms ADD COLUMN image TEXT"); } catch(e) {}
-try { db.exec("ALTER TABLE rooms ADD COLUMN amenities TEXT DEFAULT '[]'"); } catch(e) {}
-try { db.exec("ALTER TABLE rooms ADD COLUMN building TEXT DEFAULT ''"); } catch(e) {}
-try { db.exec("ALTER TABLE rooms ADD COLUMN floor TEXT DEFAULT ''"); } catch(e) {}
-try { db.exec("ALTER TABLE rooms ADD COLUMN section TEXT DEFAULT ''"); } catch(e) {}
-try { db.exec("ALTER TABLE rooms ADD COLUMN top TEXT DEFAULT ''"); } catch(e) {}
-try { db.exec("ALTER TABLE rooms ADD COLUMN left TEXT DEFAULT ''"); } catch(e) {}
-
 // Seed initial data
 const seedData = () => {
   const adminEmail = process.env.ADMIN_EMAIL || "sbidm-biblioteca@ua.pt";
@@ -242,7 +36,6 @@ const seedData = () => {
     { name: "Utilizador Teste 2", email: "teste02@ua.pt", role: "user" },
     { name: "Bibliotecário 01", email: "bib01@ua.pt", role: "bibliotecário" },
     { name: "Administrador do Sistema 01", email: adminEmail, role: "admin" },
-    { name: "Filipe Bento", email: "filben@gmail.com", role: "admin" },
   ];
 
   console.log("Seeding users...");
@@ -322,219 +115,244 @@ const seedData = () => {
   }
 };
 
-try {
-  seedData();
-  console.log("Database seeded successfully");
-} catch (error) {
-  console.error("Error seeding database:", error);
-}
+let db: any;
+const DEPLOY_TO = process.env.DEPLOY_TO || 'docker';
 
-// Nodemailer Transporter
-const smtpPort = process.env.SMTP_PORT || '465';
-console.log(`[AUTH] SMTP Config: Host=${process.env.SMTP_HOST || 'smtp.gmail.com'}, Port=${smtpPort}, User=${process.env.SMTP_USER ? 'Set' : 'Not Set'}, Pass=${process.env.SMTP_PASS ? 'Set' : 'Not Set'}`);
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(smtpPort),
-  secure: smtpPort === '465',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+async function initDatabase() {
+  if (db) return; // Already initialized
 
-function formatReservationTime(startTime: string, durationMinutes: number, lang: Language = 'pt') {
-  const [h, m] = startTime.split(':').map(Number);
-  const startTotal = h * 60 + m;
-  const endTotal = startTotal + durationMinutes;
-  
-  const endH = Math.floor(endTotal / 60) % 24;
-  const endM = endTotal % 60;
-  const endTime = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
-  
-  let durationStr = '';
-  const dh = Math.floor(durationMinutes / 60);
-  const dm = durationMinutes % 60;
-  
-  if (dh > 0) {
-    durationStr = `${dh}h${dm > 0 ? (dm < 10 ? '0' + dm : dm) : ''}`;
-  } else {
-    durationStr = `${dm}min`;
-  }
-  
-  return `${startTime} - ${endTime} (${translations[lang].duration}: ${durationStr})`;
-}
+  const dbPath = DEPLOY_TO === 'vercel' 
+    ? path.join('/tmp', 'salas.db') 
+    : path.join(dataDir, "salas.db");
 
-async function sendWelcomeEmail(email: string, name: string, lang: Language = 'pt') {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
-  const t = translations[lang];
-  try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: t.emailWelcomeSubject,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
-          <p>${translations[lang].hello} <strong>${name}</strong>,</p>
-          <p>${t.emailWelcomeBody}</p>
-          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
-        </div>
-      `,
-    });
-  } catch (error) {
-    console.error(`[EMAIL] Failed to send welcome email to ${email}:`, error);
-  }
-}
-
-async function sendReservationPendingEmail(email: string, roomName: string, date: string, startTime: string, duration: number, lang: Language = 'pt') {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
-  const t = translations[lang];
-  try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: t.emailReservationSubject,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
-          <p>${t.emailReservationBody}</p>
-          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 5px 0;"><strong>${t.emailRoom}:</strong> ${roomName}</p>
-            <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${date}</p>
-            <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(startTime, duration, lang)}</p>
-          </div>
-          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
-        </div>
-      `,
-    });
-  } catch (error) {
-    console.error(`[EMAIL] Failed to send pending email to ${email}:`, error);
-  }
-}
-
-async function sendReservationStatusEmail(email: string, roomName: string, res: any, status: string, lang: Language = 'pt') {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
-  const t = translations[lang];
-  
-  const isConfirmed = status === 'Confirmed' || status === 'Occupied';
-  const subject = isConfirmed ? t.emailReservationSubject : `${t.emailReservationSubject} - ${lang === 'pt' ? 'CANCELADA' : 'CANCELLED'}`;
-  
-  let attachments: any[] = [];
-  
-  if (isConfirmed) {
-    const [year, month, day] = res.date.split('-').map(Number);
-    const [hour, minute] = res.start_time.split(':').map(Number);
-    
-    const event: ics.EventAttributes = {
-      start: [year, month, day, hour, minute],
-      duration: { minutes: res.duration },
-      title: `Reserva SiReS Bibliotecas UA: ${roomName}`,
-      description: `Assunto: ${res.subject}`,
-      location: roomName,
-      status: 'CONFIRMED',
-      busyStatus: 'BUSY',
-    };
-
-    const { error, value } = ics.createEvent(event);
-    if (!error && value) {
-      attachments.push({
-        filename: 'reserva.ics',
-        content: value,
-        contentType: 'text/calendar'
-      });
+  if (DEPLOY_TO === 'vercel') {
+    try {
+      console.log("[DB] Fetching database from Vercel Blob...");
+      const blobUrl = process.env.DATABASE_BLOB_URL || 'data/salas.db';
+      const response = await get(blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN, access: 'public' } as any) as any;
+      const buffer = await response.blob.arrayBuffer();
+      fs.writeFileSync(dbPath, Buffer.from(buffer));
+      console.log("[DB] Database downloaded to /tmp/salas.db");
+    } catch (error) {
+      console.error("[DB] Failed to fetch database from Vercel Blob:", error);
+      // If it fails, we'll try to use the local one or create a new one in /tmp
     }
   }
 
   try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: subject,
-      attachments: attachments,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: ${isConfirmed ? '#10b981' : '#ef4444'}; text-align: center;">SiReS Bibliotecas UA</h2>
-          <p>${t.emailRoom} <strong>${roomName}</strong>: <strong>${isConfirmed ? (lang === 'pt' ? 'CONFIRMADA' : 'CONFIRMED') : (lang === 'pt' ? 'CANCELADA' : 'CANCELLED')}</strong>.</p>
-          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 5px 0;"><strong>${t.emailRoom}:</strong> ${roomName}</p>
-            <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${res.date}</p>
-            <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(res.start_time, res.duration, lang)}</p>
-            <p style="margin: 5px 0;"><strong>${lang === 'pt' ? 'Estado' : 'Status'}:</strong> ${isConfirmed ? (lang === 'pt' ? 'Confirmada' : 'Confirmed') : (lang === 'pt' ? 'Cancelada' : 'Cancelled')}</p>
-          </div>
-          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
-        </div>
-      `,
-    });
+    db = new Database(dbPath); 
+    db.pragma('foreign_keys = ON');
+    
+    // Ensure tables exist
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        role TEXT DEFAULT 'user'
+      );
+      CREATE TABLE IF NOT EXISTS rooms (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        building TEXT,
+        floor TEXT,
+        section TEXT,
+        department TEXT NOT NULL,
+        status TEXT NOT NULL,
+        capacity INTEGER,
+        description TEXT,
+        operational_status TEXT DEFAULT 'Active',
+        image TEXT,
+        amenities TEXT DEFAULT '[]',
+        top TEXT,
+        left TEXT
+      );
+      CREATE TABLE IF NOT EXISTS reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        duration INTEGER NOT NULL,
+        subject TEXT NOT NULL,
+        status TEXT DEFAULT 'Pending',
+        FOREIGN KEY (room_id) REFERENCES rooms(id),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+      CREATE TABLE IF NOT EXISTS otps (
+        email TEXT PRIMARY KEY,
+        code TEXT NOT NULL,
+        name TEXT,
+        expires_at DATETIME NOT NULL
+      );
+    `);
+
+    seedData();
+    console.log(`[DB] Database initialized and seeded successfully at: ${path.resolve(dbPath)}`);
   } catch (error) {
-    console.error(`[EMAIL] Failed to send status email to ${email}:`, error);
-  }
-}
-
-async function sendOtpEmail(email: string, code: string, lang: Language = 'pt') {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    const missing = [];
-    if (!process.env.SMTP_USER) missing.push('SMTP_USER');
-    if (!process.env.SMTP_PASS) missing.push('SMTP_PASS');
-    console.warn(`[AUTH] SMTP credentials missing (${missing.join(', ')}). OTP logged to console only.`);
-    console.log(`[AUTH] OTP for ${email}: ${code}`);
-    return;
+    console.error("[DB] Failed to initialize database:", error);
+    throw error;
   }
 
-  const t = translations[lang];
-
+  // Initialize database tables
   try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
-      to: email,
-      subject: t.emailOtpSubject,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
-          <p>${translations[lang].hello},</p>
-          <p>${t.emailOtpBody}</p>
-          <div style="background: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333; margin: 20px 0; border-radius: 8px;">
-            ${code}
-          </div>
-          <p style="color: #666; font-size: 14px;">${translations[lang].codeExpires}</p>
-          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
-        </div>
-      `,
-    });
-    console.log(`[AUTH] OTP email sent to ${email}`);
-    return true;
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        role TEXT DEFAULT 'user'
+      );
+
+      CREATE TABLE IF NOT EXISTS rooms (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        building TEXT NOT NULL,
+        floor TEXT NOT NULL,
+        section TEXT NOT NULL,
+        department TEXT NOT NULL,
+        status TEXT NOT NULL,
+        capacity INTEGER,
+        description TEXT,
+        operational_status TEXT DEFAULT 'Active',
+        image TEXT,
+        amenities TEXT DEFAULT '[]',
+        top TEXT,
+        left TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS reservations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id TEXT NOT NULL,
+        user_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        duration INTEGER NOT NULL,
+        subject TEXT NOT NULL,
+        status TEXT DEFAULT 'Pending',
+        FOREIGN KEY (room_id) REFERENCES rooms(id),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS otps (
+        email TEXT PRIMARY KEY,
+        code TEXT NOT NULL,
+        name TEXT,
+        expires_at DATETIME NOT NULL
+      );
+    `);
+    
+    // Migrations
+    try { db.exec("ALTER TABLE rooms ADD COLUMN operational_status TEXT DEFAULT 'Active'"); } catch(e) {}
+    try { db.exec("ALTER TABLE rooms ADD COLUMN image TEXT"); } catch(e) {}
+    try { db.exec("ALTER TABLE rooms ADD COLUMN amenities TEXT DEFAULT '[]'"); } catch(e) {}
+    try { db.exec("ALTER TABLE rooms ADD COLUMN building TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE rooms ADD COLUMN floor TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE rooms ADD COLUMN section TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE rooms ADD COLUMN top TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE rooms ADD COLUMN left TEXT DEFAULT ''"); } catch(e) {}
+    try { db.exec("ALTER TABLE rooms ADD COLUMN description TEXT"); } catch(e) {}
+
+    console.log("[DB] Tables initialized successfully");
+    
+    // Seed data
+    seedData();
+    console.log("[DB] Database seeded successfully");
   } catch (error) {
-    console.error(`[AUTH] Failed to send OTP email to ${email}:`, error);
-    console.log(`[AUTH] FALLBACK: OTP for ${email} is ${code} (Check SMTP credentials)`);
-    return false;
+    console.error("[DB] Failed to initialize tables or seed data:", error);
+    throw error;
   }
 }
 
-async function startServer() {
-  await initDatabase();
-  const app = express();
-  const server = http.createServer(app);
-  const wss = new WebSocketServer({ server });
-
-  const broadcast = (data: any) => {
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify(data));
-      }
+// Helper to sync database back to Vercel Blob
+async function syncDatabase() {
+  if (DEPLOY_TO !== 'vercel') return;
+  
+  try {
+    const dbPath = path.join('/tmp', 'salas.db');
+    const fileBuffer = fs.readFileSync(dbPath);
+    await put('data/salas.db', fileBuffer, { 
+      access: 'public', 
+      addRandomSuffix: false,
+      token: process.env.BLOB_READ_WRITE_TOKEN
     });
-  };
+    console.log("[DB] Database synced back to Vercel Blob");
+  } catch (error) {
+    console.error("[DB] Failed to sync database to Vercel Blob:", error);
+  }
+}
 
-  app.use(express.json());
+// Load maps from maps.txt
+const mapsPath = path.join(dataDir, "maps.txt");
+let floorPlanMaps: Record<string, string> = {};
 
-  // Health check endpoint
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+function loadMaps() {
+  try {
+    if (fs.existsSync(mapsPath)) {
+      const content = fs.readFileSync(mapsPath, "utf-8");
+      const lines = content.split("\n");
+      const newMaps: Record<string, string> = {};
+      lines.forEach(line => {
+        const parts = line.split(":");
+        if (parts.length >= 2) {
+          const key = parts[0].trim();
+          const value = parts.slice(1).join(":").trim();
+          if (key && value) {
+            newMaps[key] = value;
+          }
+        }
+      });
+      floorPlanMaps = newMaps;
+      console.log(`[MAPS] Loaded ${Object.keys(floorPlanMaps).length} floor plans from maps.txt`);
+    } else {
+      console.warn(`[MAPS] maps.txt not found at ${mapsPath}`);
+    }
+  } catch (error) {
+    console.error("[MAPS] Failed to load maps.txt:", error);
+  }
+}
+
+loadMaps();
+
+// Watch for changes in maps.txt
+if (fs.existsSync(mapsPath)) {
+  fs.watch(mapsPath, (eventType) => {
+    if (eventType === "change") {
+      console.log("[MAPS] maps.txt changed, reloading...");
+      loadMaps();
+    }
   });
+}
 
-  app.get("/api/maps", (req, res) => {
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
+const broadcast = (data: any) => {
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(data));
+    }
+  });
+};
+
+app.use(express.json());
+
+// Middleware to ensure DB is initialized
+let dbInitialized = false;
+app.use(async (req, res, next) => {
+  if (!dbInitialized && req.path.startsWith('/api')) {
+    try {
+      await initDatabase();
+      dbInitialized = true;
+    } catch (err) {
+      return res.status(500).json({ error: "Database initialization failed" });
+    }
+  }
+  next();
+});
+
+app.get("/api/maps", (req, res) => {
     res.json(floorPlanMaps);
   });
 
@@ -956,28 +774,226 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+// Health check endpoint
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Nodemailer Transporter
+const smtpPort = process.env.SMTP_PORT || '465';
+console.log(`[AUTH] SMTP Config: Host=${process.env.SMTP_HOST || 'smtp.gmail.com'}, Port=${smtpPort}, User=${process.env.SMTP_USER ? 'Set' : 'Not Set'}, Pass=${process.env.SMTP_PASS ? 'Set' : 'Not Set'}`);
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(smtpPort),
+  secure: smtpPort === '465',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+function formatReservationTime(startTime: string, durationMinutes: number, lang: Language = 'pt') {
+  const [h, m] = startTime.split(':').map(Number);
+  const startTotal = h * 60 + m;
+  const endTotal = startTotal + durationMinutes;
+  
+  const endH = Math.floor(endTotal / 60) % 24;
+  const endM = endTotal % 60;
+  const endTime = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+  
+  let durationStr = '';
+  const dh = Math.floor(durationMinutes / 60);
+  const dm = durationMinutes % 60;
+  
+  if (dh > 0) {
+    durationStr = `${dh}h${dm > 0 ? (dm < 10 ? '0' + dm : dm) : ''}`;
   } else {
-    app.use(express.static(path.join(__dirname, "dist")));
-    app.get("*all", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+    durationStr = `${dm}min`;
+  }
+  
+  return `${startTime} - ${endTime} (${translations[lang].duration}: ${durationStr})`;
+}
+
+async function sendWelcomeEmail(email: string, name: string, lang: Language = 'pt') {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const t = translations[lang];
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: t.emailWelcomeSubject,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
+          <p>${translations[lang].hello} <strong>${name}</strong>,</p>
+          <p>${t.emailWelcomeBody}</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
+        </div>
+      `,
     });
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send welcome email to ${email}:`, error);
+  }
+}
+
+async function sendReservationPendingEmail(email: string, roomName: string, date: string, startTime: string, duration: number, lang: Language = 'pt') {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const t = translations[lang];
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: t.emailReservationSubject,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
+          <p>${t.emailReservationBody}</p>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>${t.emailRoom}:</strong> ${roomName}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${date}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(startTime, duration, lang)}</p>
+          </div>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send pending email to ${email}:`, error);
+  }
+}
+
+async function sendReservationStatusEmail(email: string, roomName: string, res: any, status: string, lang: Language = 'pt') {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const t = translations[lang];
+  
+  const isConfirmed = status === 'Confirmed' || status === 'Occupied';
+  const subject = isConfirmed ? t.emailReservationSubject : `${t.emailReservationSubject} - ${lang === 'pt' ? 'CANCELADA' : 'CANCELLED'}`;
+  
+  let attachments: any[] = [];
+  
+  if (isConfirmed) {
+    const [year, month, day] = res.date.split('-').map(Number);
+    const [hour, minute] = res.start_time.split(':').map(Number);
+    
+    const event: ics.EventAttributes = {
+      start: [year, month, day, hour, minute],
+      duration: { minutes: res.duration },
+      title: `Reserva SiReS Bibliotecas UA: ${roomName}`,
+      description: `Assunto: ${res.subject}`,
+      location: roomName,
+      status: 'CONFIRMED',
+      busyStatus: 'BUSY',
+    };
+
+    const { error, value } = ics.createEvent(event);
+    if (!error && value) {
+      attachments.push({
+        filename: 'reserva.ics',
+        content: value,
+        contentType: 'text/calendar'
+      });
+    }
   }
 
-  const PORT = 3000;
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: subject,
+      attachments: attachments,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: ${isConfirmed ? '#10b981' : '#ef4444'}; text-align: center;">SiReS Bibliotecas UA</h2>
+          <p>${t.emailRoom} <strong>${roomName}</strong>: <strong>${isConfirmed ? (lang === 'pt' ? 'CONFIRMADA' : 'CONFIRMED') : (lang === 'pt' ? 'CANCELADA' : 'CANCELLED')}</strong>.</p>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>${t.emailRoom}:</strong> ${roomName}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${res.date}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(res.start_time, res.duration, lang)}</p>
+            <p style="margin: 5px 0;"><strong>${lang === 'pt' ? 'Estado' : 'Status'}:</strong> ${isConfirmed ? (lang === 'pt' ? 'Confirmada' : 'Confirmed') : (lang === 'pt' ? 'Cancelada' : 'Cancelled')}</p>
+          </div>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send status email to ${email}:`, error);
+  }
+}
+
+async function sendOtpEmail(email: string, code: string, lang: Language = 'pt') {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    const missing = [];
+    if (!process.env.SMTP_USER) missing.push('SMTP_USER');
+    if (!process.env.SMTP_PASS) missing.push('SMTP_PASS');
+    console.warn(`[AUTH] SMTP credentials missing (${missing.join(', ')}). OTP logged to console only.`);
+    console.log(`[AUTH] OTP for ${email}: ${code}`);
+    return;
+  }
+
+  const t = translations[lang];
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: t.emailOtpSubject,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
+          <p>${translations[lang].hello},</p>
+          <p>${t.emailOtpBody}</p>
+          <div style="background: #f4f4f4; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #333; margin: 20px 0; border-radius: 8px;">
+            ${code}
+          </div>
+          <p style="color: #666; font-size: 14px;">${translations[lang].codeExpires}</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
+        </div>
+      `,
+    });
+    console.log(`[AUTH] OTP email sent to ${email}`);
+    return true;
+  } catch (error) {
+    console.error(`[AUTH] Failed to send OTP email to ${email}:`, error);
+    console.log(`[AUTH] FALLBACK: OTP for ${email} is ${code} (Check SMTP credentials)`);
+    return false;
+  }
+}
+
+// Vite middleware for development
+if (process.env.NODE_ENV !== "production") {
+  const { createServer: createViteServer } = await import("vite");
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: "spa",
   });
+  app.use(vite.middlewares);
+} else {
+  app.use(express.static(path.join(__dirname, "dist")));
+  app.get("*all", (req, res) => {
+    res.sendFile(path.join(__dirname, "dist", "index.html"));
+  });
+}
+
+// Export for Vercel
+export default app;
+
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    await initDatabase();
+    dbInitialized = true;
+    const PORT = 3000;
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+    });
+  }
 }
 
 startServer().catch(err => {
   console.error("Failed to start server:", err);
-  process.exit(1);
+  if (!process.env.VERCEL) process.exit(1);
 });

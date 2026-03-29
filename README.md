@@ -21,9 +21,10 @@ The system features:
 
 ### Prerequisites
 
-- **Node.js** (v16 or higher)
+- **Node.js** (v18 or higher)
 - **npm** (v7 or higher)
 - **Docker & Docker Compose** (optional, for containerized deployment)
+- **Vercel Account** (optional, for Vercel deployment)
 
 ### Installation
 
@@ -58,6 +59,26 @@ The system features:
    ```
 
 The application will be available at `http://localhost:3000`
+
+---
+
+## 🔼 Vercel Deployment
+
+This application is optimized for Vercel deployment using **Vercel Blob Storage** for SQLite persistence.
+
+### Steps to Deploy
+
+1. **Create a Vercel Project** and link it to your repository.
+2. **Enable Vercel Blob Storage** in your Vercel project settings.
+3. **Configure Environment Variables** in Vercel (see below).
+4. **Deploy!** Vercel will automatically use `vercel.json` for configuration.
+
+### Required Vercel Environment Variables
+
+- `DEPLOY_TO=vercel`
+- `BLOB_READ_WRITE_TOKEN`: Automatically provided by Vercel when Blob is enabled.
+- `ADMIN_EMAIL`: Your admin email.
+- `SMTP_*`: Your email configuration variables.
 
 ---
 
