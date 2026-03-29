@@ -93,9 +93,9 @@ const seedData = () => {
   const reservationCount = db.prepare("SELECT count(*) as count FROM reservations").get() as { count: number };
   if (reservationCount.count <= 2) { // If only initial mock data exists, add more
     const extraReservations = [
-      { room_id: '101', user_id: u2.id, date: '2026-03-05', start_time: '14:00', duration: 60, subject: 'Estudo Individual', status: 'Occupied' },
-      { room_id: '202', user_id: u2.id, date: '2026-03-05', start_time: '16:00', duration: 90, subject: 'Projeto de Redes', status: 'Pending' },
-      { room_id: '301', user_id: u2.id, date: '2026-03-06', start_time: '09:00', duration: 120, subject: 'Preparação Palestra', status: 'Pending' },
+      { room_id: '17.2.14', user_id: u2.id, date: '2026-03-05', start_time: '14:00', duration: 60, subject: 'Estudo Individual', status: 'Occupied' },
+      { room_id: '17.2.15', user_id: u2.id, date: '2026-03-05', start_time: '16:00', duration: 90, subject: 'Projeto de Redes', status: 'Pending' },
+      { room_id: '18.1.01', user_id: u2.id, date: '2026-03-06', start_time: '09:00', duration: 120, subject: 'Preparação Palestra', status: 'Pending' },
     ];
     
     const insertReservation = db.prepare("INSERT INTO reservations (room_id, user_id, date, start_time, duration, subject, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
@@ -103,13 +103,25 @@ const seedData = () => {
     // Initial data if count was 0
     if (reservationCount.count === 0) {
       const initialReservations = [
-        { room_id: '101', user_id: u1.id, date: '2026-03-05', start_time: '10:00', duration: 120, subject: 'Group Study', status: 'Occupied' },
-        { room_id: '102', user_id: u1.id, date: '2026-03-06', start_time: '12:00', duration: 60, subject: 'Tese Review', status: 'Pending' },
+        { room_id: '17.2.14', user_id: u1.id, date: '2026-03-05', start_time: '10:00', duration: 120, subject: 'Group Study', status: 'Occupied' },
+        { room_id: '18.1.02', user_id: u1.id, date: '2026-03-06', start_time: '12:00', duration: 60, subject: 'Tese Review', status: 'Pending' },
       ];
-      initialReservations.forEach(res => insertReservation.run(res.room_id, res.user_id, res.date, res.start_time, res.duration, res.subject, res.status));
+      initialReservations.forEach(res => {
+        try {
+          insertReservation.run(res.room_id, res.user_id, res.date, res.start_time, res.duration, res.subject, res.status);
+        } catch (e) {
+          console.warn(`[DB] Failed to insert initial reservation for room ${res.room_id}:`, e);
+        }
+      });
     }
 
-    extraReservations.forEach(res => insertReservation.run(res.room_id, res.user_id, res.date, res.start_time, res.duration, res.subject, res.status));
+    extraReservations.forEach(res => {
+      try {
+        insertReservation.run(res.room_id, res.user_id, res.date, res.start_time, res.duration, res.subject, res.status);
+      } catch (e) {
+        console.warn(`[DB] Failed to insert extra reservation for room ${res.room_id}:`, e);
+      }
+    });
   }
 };
 
