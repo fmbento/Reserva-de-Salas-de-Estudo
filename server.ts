@@ -115,18 +115,19 @@ const seedData = () => {
 
 let db: any;
 let initPromise: Promise<void> | null = null;
-const DEPLOY_TO = process.env.DEPLOY_TO || 'docker';
+const IS_VERCEL = !!process.env.VERCEL;
+const DEPLOY_TO = process.env.DEPLOY_TO || (IS_VERCEL ? 'vercel' : 'docker');
 
 async function initDatabase() {
   if (db) return;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    const dbPath = DEPLOY_TO === 'vercel' 
+    const dbPath = IS_VERCEL 
       ? path.join('/tmp', 'salas.db') 
       : path.join(dataDir, "salas.db");
 
-    if (DEPLOY_TO === 'vercel') {
+    if (IS_VERCEL) {
       try {
         const blobUrl = process.env.DATABASE_BLOB_URL;
         const token = process.env.BLOB_READ_WRITE_TOKEN;
@@ -135,7 +136,7 @@ async function initDatabase() {
           console.error("[DB] BLOB_READ_WRITE_TOKEN is missing. Cannot fetch database from Vercel Blob.");
         } else if (blobUrl && blobUrl.startsWith('http')) {
           console.log("[DB] Fetching database from Vercel Blob:", blobUrl);
-          const response = await get(blobUrl, { token: token as string, access: 'public' });
+          const response = await get(blobUrl, { token: token as string });
           // @vercel/blob get returns a Blob.
           const blob = response as unknown as Blob;
           const buffer = await blob.arrayBuffer();
@@ -222,7 +223,7 @@ async function initDatabase() {
 
 // Helper to sync database back to Vercel Blob
 async function syncDatabase() {
-  if (DEPLOY_TO !== 'vercel') return;
+  if (!IS_VERCEL) return;
   
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
@@ -277,7 +278,7 @@ function loadMaps() {
 loadMaps();
 
 // Watch for changes in maps.txt (disabled on Vercel)
-if (fs.existsSync(mapsPath) && !process.env.VERCEL) {
+if (fs.existsSync(mapsPath) && !IS_VERCEL) {
   fs.watch(mapsPath, (eventType) => {
     if (eventType === "change") {
       console.log("[MAPS] maps.txt changed, reloading...");
@@ -290,7 +291,7 @@ const app = express();
 const server = http.createServer(app);
 let wss: WebSocketServer | null = null;
 
-if (!process.env.VERCEL) {
+if (!IS_VERCEL) {
   wss = new WebSocketServer({ server });
   
   wss.on("connection", (ws) => {
@@ -376,9 +377,19 @@ app.get("/api/maps", (req, res) => {
       console.error("[AUTH] Error in request-otp:", error);
       res.status(500).json({ 
         error: t.errorRequestOtp,
-        details: process.env.NODE_ENV !== 'production' ? error.message : undefined
+        details: error.message,
+        stack: IS_VERCEL ? undefined : error.stack
       });
     }
+  });
+
+  app.get("/api/auth/test-email", async (req, res) => {
+    const { email } = req.query;
+    if (!email) return res.status(400).json({ error: "Email required" });
+    
+    console.log(`[AUTH] Testing email sending to ${email}...`);
+    const success = await sendOtpEmail(email as string, "12345", 'pt');
+    res.json({ success, message: success ? "Email sent successfully" : "Failed to send email. Check server logs." });
   });
 
   app.post("/api/auth/verify-otp", async (req, res) => {
@@ -764,6 +775,9 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  tls: {
+    rejectUnauthorized: false
+  }
 });
 
 function formatReservationTime(startTime: string, durationMinutes: number, lang: Language = 'pt') {
@@ -957,7 +971,7 @@ if (process.env.NODE_ENV !== "production") {
 export default app;
 
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  if (process.env.NODE_ENV !== 'production' || !IS_VERCEL) {
     await initDatabase();
     dbInitialized = true;
     const PORT = 3000;
