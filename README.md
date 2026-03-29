@@ -423,6 +423,10 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.4.3 (March 29, 2026)
+- **MIME Type Fix**: Updated `vercel.json` with `handle: filesystem` to ensure static assets are served correctly by Vercel's edge network, preventing MIME type errors for module scripts.
+- **Path Resolution**: Switched to `process.cwd()` for `dist` path resolution in `server.ts` for better Vercel compatibility.
+
 ### Version 0.4.2 (March 29, 2026)
 - **TypeScript Fixes**: Resolved build errors on Vercel related to `@vercel/blob` type safety.
 - **Improved Syncing**: Added token validation before attempting to sync the database back to Vercel Blob.
