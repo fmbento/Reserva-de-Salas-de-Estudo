@@ -141,14 +141,21 @@ async function initDatabase() {
 
     if (IS_VERCEL) {
       try {
-        const blobUrl = process.env.DATABASE_BLOB_URL;
+        let blobUrl = process.env.DATABASE_BLOB_URL;
+        if (blobUrl) {
+          blobUrl = blobUrl.replace(/^['"]|['"]$/g, '');
+        }
         const token = process.env.BLOB_READ_WRITE_TOKEN;
         
         if (!token) {
           console.error("[DB] BLOB_READ_WRITE_TOKEN is missing. Cannot fetch database from Vercel Blob.");
         } else if (blobUrl && blobUrl.startsWith('http')) {
           console.log("[DB] Fetching database from Vercel Blob:", blobUrl);
-          const response = await fetch(blobUrl);
+          const response = await fetch(blobUrl, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
           if (!response.ok) {
             throw new Error(`Failed to fetch database: ${response.status} ${response.statusText}`);
           }
@@ -247,8 +254,14 @@ async function syncDatabase() {
   try {
     const dbPath = path.join('/tmp', 'salas.db');
     const fileBuffer = fs.readFileSync(dbPath);
+    let blobUrl = process.env.DATABASE_BLOB_URL;
+    if (blobUrl) {
+      blobUrl = blobUrl.replace(/^['"]|['"]$/g, '');
+    }
+    const isPrivate = blobUrl && blobUrl.includes('.private.blob.');
+    
     const blob = await put('data/salas.db', fileBuffer, { 
-      access: 'public', 
+      access: isPrivate ? 'private' : 'public', 
       addRandomSuffix: false,
       token: token
     });
