@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the application.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["user", "bibliotecário", "admin", "blocked"] }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Room": {
+      "title": "Room",
+      "description": "A study room.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "building": { "type": "string" },
+        "floor": { "type": "string" },
+        "section": { "type": "string" },
+        "department": { "type": "string" },
+        "status": { "type": "string", "enum": ["Available", "Pending", "Occupied"] },
+        "capacity": { "type": "number" },
+        "description": { "type": "string" },
+        "operationalStatus": { "type": "string", "enum": ["Active", "Maintenance", "Inactive"] },
+        "image": { "type": "string" },
+        "amenities": { "type": "array", "items": { "type": "string" } },
+        "top": { "type": "string" },
+        "left": { "type": "string" }
+      },
+      "required": ["name", "department", "status", "capacity", "operationalStatus"]
+    },
+    "Reservation": {
+      "title": "Reservation",
+      "description": "A room reservation.",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "duration": { "type": "number" },
+        "subject": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Confirmed", "Completed", "Cancelled", "Occupied"] }
+      },
+      "required": ["roomId", "userId", "date", "startTime", "duration", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles."
+    },
+    "/rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/Room" },
+      "description": "Study rooms."
+    },
+    "/reservations/{reservationId}": {
+      "schema": { "$ref": "#/entities/Reservation" },
+      "description": "Room reservations."
+    }
+  }
+}

@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function getUserData() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data : null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email == 'filben@gmail.com' && request.auth.token.email_verified == true) ||
+        (getUserData() != null && getUserData().role == 'admin')
+      );
+    }
+    
+    function isLibrarian() {
+      return isAuthenticated() && (
+        isAdmin() || 
+        (getUserData() != null && getUserData().role == 'bibliotecário')
+      );
+    }
+    
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'role']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.role in ['user', 'bibliotecário', 'admin', 'blocked'];
+    }
+    
+    function isValidRoom(data) {
+      return data.keys().hasAll(['name', 'department', 'status', 'capacity', 'operationalStatus']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.department is string && data.department.size() > 0 && data.department.size() < 100 &&
+             data.status in ['Available', 'Pending', 'Occupied'] &&
+             data.capacity is number && data.capacity >= 0 &&
+             data.operationalStatus in ['Active', 'Maintenance', 'Inactive'];
+    }
+    
+    function isValidReservation(data) {
+      return data.keys().hasAll(['roomId', 'userId', 'date', 'startTime', 'duration', 'status']) &&
+             data.roomId is string && data.roomId.size() > 0 && data.roomId.size() < 100 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.date is string && data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") &&
+             data.startTime is string && data.startTime.matches("^\\d{2}:\\d{2}$") &&
+             data.duration is number && data.duration > 0 &&
+             data.status in ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Occupied'];
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+    
+    match /rooms/{roomId} {
+      allow read: if isAuthenticated();
+      allow create: if isLibrarian() && isValidRoom(request.resource.data);
+      allow update: if isLibrarian() && isValidRoom(request.resource.data);
+      allow delete: if isLibrarian();
+    }
+    
+    match /reservations/{reservationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidReservation(request.resource.data) && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidReservation(request.resource.data) && (
+        (request.resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId) || isLibrarian()
+      );
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isLibrarian());
+    }
+  }
+}

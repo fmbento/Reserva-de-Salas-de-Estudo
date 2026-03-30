@@ -233,6 +233,8 @@ export interface TranslationKeys {
   emailReservationCancelledSubject: string;
   emailReservationCancelledTitle: string;
   emailReservationCancelledBody: string;
+  emailReservationApproved: string;
+  emailReservationRejected: string;
   emailDetailsTitle: string;
   emailRoomLabel: string;
   emailDateLabel: string;
@@ -479,6 +481,8 @@ export const translations: Record<Language, TranslationKeys> = {
     emailReservationCancelledSubject: "Reserva Cancelada: {roomName}",
     emailReservationCancelledTitle: "Reserva Cancelada",
     emailReservationCancelledBody: "A sua reserva para a sala {roomName} no dia {date} às {time} foi cancelada.",
+    emailReservationApproved: "A sua reserva foi aprovada.",
+    emailReservationRejected: "A sua reserva foi rejeitada/cancelada.",
     emailDetailsTitle: "Detalhes da Reserva:",
     emailRoomLabel: "Sala",
     emailDateLabel: "Data",
@@ -723,6 +727,8 @@ export const translations: Record<Language, TranslationKeys> = {
     emailReservationCancelledSubject: "Reservation Cancelled: {roomName}",
     emailReservationCancelledTitle: "Reservation Cancelled",
     emailReservationCancelledBody: "Your reservation for room {roomName} on {date} at {time} has been cancelled.",
+    emailReservationApproved: "Your reservation has been approved.",
+    emailReservationRejected: "Your reservation has been rejected/cancelled.",
     emailDetailsTitle: "Reservation Details:",
     emailRoomLabel: "Room",
     emailDateLabel: "Date",

@@ -79,7 +79,7 @@ interface Reservation {
   id: string;
   roomId: string;
   roomName: string;
-  userId: number;
+  userId: string;
   date: string;
   startTime: string;
   duration: string;
@@ -88,7 +88,7 @@ interface Reservation {
 }
 
 interface UserData {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: 'user' | 'bibliotecário' | 'admin' | 'blocked';
@@ -113,6 +113,58 @@ const LanguageToggle = ({ lang, setLang }: { lang: Language, setLang: (l: Langua
     {lang.toUpperCase()}
   </button>
 );
+import { auth, googleProvider, signInWithPopup, db, doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, deleteDoc, addDoc, onSnapshot, signOut, onAuthStateChanged } from './firebase';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
 
 const Login = ({ 
   onLoginSuccess, 
@@ -128,124 +180,62 @@ const Login = ({
   toggleTheme: () => void
 }) => {
   const t = translations[lang];
-  const [step, setStep] = useState<'request' | 'verify'>('request');
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [otp, setOtp] = useState(['', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.endsWith('@ua.pt') && email !== 'filben@gmail.com') {
-      setError(t.invalidEmail);
-      return;
-    }
+  const handleGoogleLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/auth/request-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email, 
-          name: mode === 'register' ? name : undefined, 
-          type: mode,
-          lang // Pass language to backend for emails
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setStep('verify');
-      } else {
-        setError(data.error || t.connectionError);
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      if (!user.email?.endsWith('@ua.pt') && user.email !== 'filben@gmail.com') {
+        setError(t.restrictedDomain);
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      setError(t.connectionError);
+
+      // Check if user exists in Firestore
+      const userRef = doc(db, 'users', user.uid);
+      let userSnap;
+      try {
+        userSnap = await getDoc(userRef);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
+        return;
+      }
+      
+      let userData: UserData;
+      
+      if (userSnap.exists()) {
+        userData = userSnap.data() as UserData;
+        if (userData.role === 'blocked') {
+          setError(t.userBlockedError);
+          setLoading(false);
+          return;
+        }
+      } else {
+        userData = {
+          id: user.uid,
+          name: user.displayName || user.email?.split('@')[0] || 'User',
+          email: user.email || '',
+          role: user.email === 'filben@gmail.com' ? 'admin' : 'user'
+        };
+        try {
+          await setDoc(userRef, userData);
+        } catch (error) {
+          handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
+          return;
+        }
+      }
+      
+      onLoginSuccess(userData);
+    } catch (err: any) {
+      console.error(err);
+      setError(t.connectionError || err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const code = otp.join('');
-    if (code.length < 5) {
-      setError(t.enterOtp);
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code, lang }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        onLoginSuccess(data);
-      } else {
-        setError(data.error || t.incorrectOtpFrontend);
-      }
-    } catch (err) {
-      setError(t.connectionError);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) value = value[value.length - 1];
-    if (value && !/^\d$/.test(value)) return;
-
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-
-    if (value && index < 4) {
-      const nextInput = document.getElementById(`otp-${index + 1}`);
-      nextInput?.focus();
-    }
-
-    // Auto-submit if all digits are filled
-    if (newOtp.every(digit => digit !== '') && newOtp.join('').length === 5) {
-      // Small delay to ensure state is updated and user sees the last digit
-      setTimeout(() => {
-        handleVerifyOtp();
-      }, 100);
-    }
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').slice(0, 5);
-    if (!/^\d+$/.test(pastedData)) return;
-
-    const newOtp = [...otp];
-    const digits = pastedData.split('');
-    digits.forEach((digit, idx) => {
-      if (idx < 5) newOtp[idx] = digit;
-    });
-    setOtp(newOtp);
-
-    // Focus last filled input or the next one
-    const lastIdx = Math.min(digits.length - 1, 4);
-    const nextInput = document.getElementById(`otp-${lastIdx}`);
-    nextInput?.focus();
-
-    if (newOtp.every(digit => digit !== '') && newOtp.join('').length === 5) {
-      setTimeout(() => {
-        handleVerifyOtp();
-      }, 100);
-    }
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      const prevInput = document.getElementById(`otp-${index - 1}`);
-      prevInput?.focus();
     }
   };
 
@@ -256,7 +246,6 @@ const Login = ({
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 flex flex-col items-center relative"
       >
-        {/* Header Toggles */}
         <div className="absolute top-6 right-6 flex items-center gap-2">
           <LanguageToggle lang={lang} setLang={setLang} />
           <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
@@ -276,9 +265,7 @@ const Login = ({
           <span className="md:hidden">{t.loginTitleMobile}</span>
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 text-center">
-          {step === 'request' 
-            ? (mode === 'login' ? t.loginSubtitle : t.registerSubtitle)
-            : t.verifySubtitle}
+          {t.loginSubtitle}
         </p>
 
         {error && (
@@ -288,115 +275,21 @@ const Login = ({
           </div>
         )}
 
-        {step === 'request' ? (
-          <form onSubmit={handleRequestOtp} className="w-full space-y-6">
-            {mode === 'register' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.nameLabel}</label>
-                <input 
-                  type="text" 
-                  placeholder={t.namePlaceholder}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0066cc] focus:border-transparent transition-all"
-                />
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t.emailLabel}</label>
-              <input 
-                type="email" 
-                placeholder="utilizador@ua.pt"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0066cc] focus:border-transparent transition-all"
-              />
-              <p className="text-xs text-slate-400 dark:text-slate-500">{t.restrictedDomain}</p>
-            </div>
-
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-70"
-            >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : t.receiveOtp}
-            </button>
-
-            <div className="text-center">
-              <button 
-                type="button"
-                onClick={() => {
-                  setMode(mode === 'login' ? 'register' : 'login');
-                  setError('');
-                }}
-                className="text-sm text-[#0066cc] font-bold hover:underline"
-              >
-                {mode === 'login' ? t.noAccount : t.hasAccount}
-              </button>
-            </div>
-            
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
-              <p className="text-xs font-bold text-slate-300 dark:text-slate-600 tracking-widest uppercase">{t.restrictedDomain}</p>
-            </div>
-          </form>
-        ) : (
-          <div className="w-full space-y-8">
-            <div className="flex justify-between gap-2">
-              {otp.map((digit, idx) => (
-                <input
-                  key={idx}
-                  id={`otp-${idx}`}
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleOtpChange(idx, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(idx, e)}
-                  onPaste={handlePaste}
-                  className="w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:border-[#0066cc] focus:outline-none transition-all"
-                />
-              ))}
-            </div>
-
-            <button 
-              onClick={() => handleVerifyOtp()}
-              disabled={loading || otp.join('').length < 5}
-              className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-70"
-            >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : (
-                <>
-                  {t.enter} <ArrowRight size={20} />
-                </>
-              )}
-            </button>
-
-            <div className="text-center">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {t.resendCode.includes('?') ? (
-                  <>
-                    {t.resendCode.split('?')[0]}? <button onClick={handleRequestOtp} className="text-[#0066cc] font-bold hover:underline">{t.resendCode.split('?')[1].trim()}</button>
-                  </>
-                ) : (
-                  <button onClick={handleRequestOtp} className="text-[#0066cc] font-bold hover:underline">{t.resendCode}</button>
-                )}
-              </p>
-            </div>
-
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
-              <p className="text-xs font-bold text-slate-300 dark:text-slate-600 tracking-widest uppercase">{t.uaTitle}</p>
-            </div>
-          </div>
-        )}
+        <button 
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+        >
+          {loading ? <Loader2 className="animate-spin" size={20} /> : 'Login com Google'}
+        </button>
+        
+        <div className="pt-8 border-t border-slate-100 dark:border-slate-800 text-center w-full mt-8">
+          <p className="text-xs font-bold text-slate-300 dark:text-slate-600 tracking-widest uppercase">{t.restrictedDomain}</p>
+        </div>
       </motion.div>
-      
-      <p className="mt-8 text-slate-500 dark:text-slate-400 text-sm">{t.helpAccess}</p>
     </div>
   );
-};
+};;
 
 const ManageUsersView = ({ lang, onBack }: { lang: string, onBack: () => void }) => {
   const t = translations[lang as keyof typeof translations];
@@ -417,16 +310,21 @@ const ManageUsersView = ({ lang, onBack }: { lang: string, onBack: () => void })
     setFoundUser(null);
 
     try {
-      const res = await fetch(`/api/users/search?email=${encodeURIComponent(searchEmail)}&lang=${lang}`);
-      const data = await res.json();
+      const q = query(collection(db, 'users'), where('email', '==', searchEmail));
+      const querySnapshot = await getDocs(q);
 
-      if (!res.ok) {
-        throw new Error(data.error || t.errorOccurred);
+      if (querySnapshot.empty) {
+        throw new Error(t.errorOccurred); // Or a specific "user not found" message if available in translations
       }
 
-      setFoundUser(data);
+      const userDoc = querySnapshot.docs[0];
+      setFoundUser({ id: userDoc.id, ...userDoc.data() } as UserData);
     } catch (err: any) {
-      setError(err.message);
+      if (err.message === t.errorOccurred) {
+        setError(err.message);
+      } else {
+        handleFirestoreError(err, OperationType.LIST, 'users');
+      }
     } finally {
       setIsSearching(false);
     }
@@ -440,21 +338,13 @@ const ManageUsersView = ({ lang, onBack }: { lang: string, onBack: () => void })
     setSuccess(null);
 
     try {
-      const res = await fetch(`/api/users/${foundUser.id}/role`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole, lang })
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || t.errorOccurred);
-      }
+      const userRef = doc(db, 'users', foundUser.id);
+      await updateDoc(userRef, { role: newRole });
 
       setFoundUser({ ...foundUser, role: newRole as any });
-      setSuccess(data.message);
+      setSuccess(t.userUpdatedSuccess || 'Role updated successfully');
     } catch (err: any) {
-      setError(err.message);
+      handleFirestoreError(err, OperationType.UPDATE, `users/${foundUser.id}`);
     } finally {
       setIsUpdating(false);
     }
@@ -1780,6 +1670,8 @@ export default function App() {
     newStartTime?: string;
   }>({ isOpen: false, type: 'room', originalDuration: 0, newDuration: 0 });
 
+  const [isAuthReady, setIsAuthReady] = useState<boolean>(false);
+
   useEffect(() => {
     const savedUser = localStorage.getItem('sirs_user');
     if (savedUser) {
@@ -1787,6 +1679,19 @@ export default function App() {
       setCurrentUser(user);
       setIsLoggedIn(true);
     }
+    
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsAuthReady(true);
+      } else {
+        setIsAuthReady(false);
+        setIsLoggedIn(false);
+        setCurrentUser(null);
+        localStorage.removeItem('sirs_user');
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleLoginSuccess = (user: UserData) => {
@@ -1795,7 +1700,12 @@ export default function App() {
     setIsLoggedIn(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
     localStorage.removeItem('sirs_user');
     setIsLoggedIn(false);
     setCurrentUser(null);
@@ -1805,84 +1715,61 @@ export default function App() {
     console.log("Current allUsers state:", allUsers);
   }, [allUsers]);
 
-  // Fetch initial data
-  const fetchData = async () => {
-    try {
-      const [roomsRes, reservationsRes, allUsersRes, mapsRes] = await Promise.all([
-        fetch('/api/rooms'),
-        fetch('/api/reservations'),
-        fetch('/api/users'),
-        fetch('/api/maps')
-      ]);
+  useEffect(() => {
+    if (!isLoggedIn || !isAuthReady) return;
 
-      const roomsData = await roomsRes.json();
-      const reservationsData = await reservationsRes.json();
-      const allUsersData = await allUsersRes.json();
-      const mapsData = await mapsRes.json();
-      
-      setFloorPlanMaps(mapsData);
-      console.log("Fetched all users:", allUsersData);
-      setAllUsers(allUsersData);
+    // Fetch maps config from server
+    fetch('/api/maps')
+      .then(res => res.json())
+      .then(data => setFloorPlanMaps(data))
+      .catch(err => console.error("Failed to fetch maps:", err));
 
-      // Map database rooms to frontend Room interface
+    const unsubRooms = onSnapshot(collection(db, 'rooms'), (snapshot) => {
+      const roomsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       const mappedRooms = roomsData.map((r: any) => ({
         ...r,
-        operationalStatus: r.operational_status || 'Active',
-        amenities: r.amenities ? JSON.parse(r.amenities) : ['Eduroam', 'Tomadas'],
+        operationalStatus: r.operationalStatus || r.operational_status || 'Active',
+        amenities: Array.isArray(r.amenities) ? r.amenities : (r.amenities ? JSON.parse(r.amenities) : ['Eduroam', 'Tomadas']),
         image: r.image || 'https://picsum.photos/seed/' + r.id + '/800/600',
         top: r.top || (r.id === '101' ? '20%' : r.id === '102' ? '20%' : r.id === '201' ? '50%' : '70%'),
         left: r.left || (r.id === '101' ? '15%' : r.id === '102' ? '30%' : r.id === '201' ? '45%' : '70%')
       }));
+      setRooms(mappedRooms);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'rooms');
+    });
 
-      // Map database reservations to frontend Reservation interface
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      setAllUsers(usersData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'users');
+    });
+
+    const unsubReservations = onSnapshot(collection(db, 'reservations'), (snapshot) => {
+      const reservationsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       const mappedReservations = reservationsData.map((r: any) => ({
-        id: r.id.toString(),
-        roomId: r.room_id,
-        roomName: r.room_name,
-        userId: r.user_id,
+        id: r.id,
+        roomId: r.roomId || r.room_id,
+        roomName: r.roomName || r.room_name || r.roomId,
+        userId: r.userId || r.user_id,
         date: r.date,
-        startTime: r.start_time,
+        startTime: r.startTime || r.start_time,
         duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
         subject: r.subject,
         status: r.status
       }));
-
-      setRooms(mappedRooms);
       setReservations(mappedReservations);
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-    }
-  };
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    fetchData();
-
-    // WebSocket for real-time updates
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}`;
-    const socket = new WebSocket(wsUrl);
-
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'RESERVATIONS_UPDATED' || data.type === 'ROOMS_UPDATED' || data.type === 'USERS_UPDATED') {
-          console.log(`[WS] Received ${data.type}, re-fetching data...`);
-          fetchData();
-        }
-      } catch (err) {
-        console.error("[WS] Error parsing message:", err);
-      }
-    };
-
-    socket.onopen = () => console.log("[WS] Connected to real-time updates");
-    socket.onclose = () => console.log("[WS] Disconnected from real-time updates");
-    socket.onerror = (err) => console.error("[WS] WebSocket error:", err);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'reservations');
+    });
 
     return () => {
-      socket.close();
+      unsubRooms();
+      unsubUsers();
+      unsubReservations();
     };
-  }, [isLoggedIn]);
+  }, [isLoggedIn, isAuthReady]);
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId) || rooms[0];
 
@@ -2074,54 +1961,31 @@ export default function App() {
     }
 
     try {
-      const response = await fetch('/api/reservations', {
+      const newReservation = {
+        roomId: selectedRoomId,
+        userId: currentUser?.id || '1',
+        date: bookingDate,
+        startTime: activeStartTime,
+        duration: durationMins,
+        subject: bookingSubject,
+        status: 'Pending'
+      };
+
+      await addDoc(collection(db, 'reservations'), newReservation);
+
+      fetch('/api/emails/reservation-pending', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          room_id: selectedRoomId,
-          user_id: currentUser?.id || 1,
+          email: currentUser?.email,
+          roomName: selectedRoom.name,
           date: bookingDate,
-          start_time: activeStartTime,
+          startTime: activeStartTime,
           duration: durationMins,
-          subject: bookingSubject,
-          lang // Pass language to backend for emails
+          lang
         })
-      });
+      }).catch(console.error);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 401) {
-          handleLogout();
-          setBookingStatus('error');
-          setBookingMessage(t.sessionExpiredError);
-          return;
-        }
-        if (response.status === 409) {
-          setBookingStatus('error');
-          setBookingMessage(errorData.error || t.timeConflict);
-          return;
-        }
-        throw new Error(errorData.error || errorData.details || t.errorCreatingBooking);
-      }
-
-      const newRes = await response.json();
-      
-      // Refresh reservations
-      const reservationsRes = await fetch('/api/reservations');
-      const reservationsData = await reservationsRes.json();
-      const mappedReservations = reservationsData.map((r: any) => ({
-        id: r.id.toString(),
-        roomId: r.room_id,
-        roomName: r.room_name,
-        userId: r.user_id,
-        date: r.date,
-        startTime: r.start_time,
-        duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
-        subject: r.subject,
-        status: r.status
-      }));
-
-      setReservations(mappedReservations);
       setBookingStatus('success');
       setBookingMessage(t.bookingSuccess);
       
@@ -2129,6 +1993,7 @@ export default function App() {
     } catch (error: any) {
       setBookingStatus('error');
       setBookingMessage(error.message || 'Lamentamos, mas ocorreu um erro ao processar a sua reserva.');
+      handleFirestoreError(error, OperationType.CREATE, 'reservations');
     }
   };
 
@@ -2141,105 +2006,110 @@ export default function App() {
     if (!reservationToDelete) return;
     
     try {
-      const response = await fetch(`/api/reservations/${reservationToDelete}?lang=${lang}`, {
-        method: 'DELETE'
-      });
+      const res = reservations.find(r => r.id === reservationToDelete);
+      const user = allUsers.find(u => u.id === res?.userId);
 
-      if (!response.ok) throw new Error("Failed to delete reservation");
+      await deleteDoc(doc(db, 'reservations', reservationToDelete));
 
-      setReservations(prev => prev.filter(res => res.id !== reservationToDelete));
+      if (res && user) {
+        fetch('/api/emails/reservation-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            roomName: res.roomName,
+            reservation: res,
+            status: 'Cancelled',
+            lang
+          })
+        }).catch(console.error);
+      }
+
       setReservationToDelete(null);
       setBookingStatus('success');
       setBookingMessage(t.reservationDeletedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error) {
-      console.error("Delete failed:", error);
+      handleFirestoreError(error, OperationType.DELETE, `reservations/${reservationToDelete}`);
     }
   };
 
   const handleSwitchUser = async (email: string) => {
     try {
-      const res = await fetch(`/api/user/me?email=${email}`);
-      const userData = await res.json();
-      setCurrentUser(userData);
-      setShowUserSwitcher(false);
+      const q = query(collection(db, 'users'), where('email', '==', email));
+      const querySnapshot = await getDocs(q);
       
-      if (userData.role === 'bibliotecário' || userData.role === 'admin') {
-        setCurrentView('backoffice');
-      } else {
-        setCurrentView('map');
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        const userData = { id: userDoc.id, ...userDoc.data() } as UserData;
+        setCurrentUser(userData);
+        setShowUserSwitcher(false);
+        
+        if (userData.role === 'bibliotecário' || userData.role === 'admin') {
+          setCurrentView('backoffice');
+        } else {
+          setCurrentView('map');
+        }
       }
     } catch (error) {
-      console.error("Failed to switch user:", error);
+      handleFirestoreError(error, OperationType.LIST, 'users');
     }
   };
 
   const handleUpdateReservationStatus = async (id: string, status: string) => {
     try {
-      const response = await fetch(`/api/reservations/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, lang })
-      });
+      await updateDoc(doc(db, 'reservations', id), { status });
 
-      if (!response.ok) throw new Error("Failed to update status");
+      const res = reservations.find(r => r.id === id);
+      const user = allUsers.find(u => u.id === res?.userId);
+      if (res && user) {
+        fetch('/api/emails/reservation-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            roomName: res.roomName,
+            reservation: res,
+            status,
+            lang
+          })
+        }).catch(console.error);
+      }
 
-      setReservations(prev => prev.map(res => res.id === id ? { ...res, status: status as any } : res));
       setBookingStatus('success');
       setBookingMessage(status === 'Confirmed' ? t.reservationApprovedSuccess : t.reservationRejectedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error) {
-      console.error("Update failed:", error);
+      handleFirestoreError(error, OperationType.UPDATE, `reservations/${id}`);
     }
   };
 
   const handleUpdateRoom = async (roomId: string, updatedData: Partial<Room>) => {
     try {
-      const response = await fetch(`/api/rooms/${roomId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...updatedData, lang })
-      });
+      await updateDoc(doc(db, 'rooms', roomId), updatedData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update room");
-      }
-
-      setRooms(prev => prev.map(r => r.id === roomId ? { ...r, ...updatedData } : r));
       setBookingStatus('success');
       setBookingMessage(t.roomUpdatedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error: any) {
-      console.error("Update failed:", error);
       setBookingStatus('error');
-      setBookingMessage(error.message === "Failed to update room" ? t.errorUpdatingRoom : error.message);
+      setBookingMessage(t.errorUpdatingRoom || error.message);
+      handleFirestoreError(error, OperationType.UPDATE, `rooms/${roomId}`);
     }
   };
 
   const handleCreateRoom = async (newRoomData: Partial<Room>) => {
     try {
-      const response = await fetch(`/api/rooms`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newRoomData, lang })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create room");
-      }
-
-      const createdRoom = await response.json();
-      setRooms(prev => [...prev, createdRoom]);
+      const docRef = await addDoc(collection(db, 'rooms'), newRoomData);
+      
       setBookingStatus('success');
       setBookingMessage(t.roomCreatedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
-      return createdRoom;
+      return { id: docRef.id, ...newRoomData };
     } catch (error: any) {
-      console.error("Creation failed:", error);
       setBookingStatus('error');
-      setBookingMessage(error.message === "Failed to create room" ? t.errorCreatingRoom : error.message);
+      setBookingMessage(t.errorCreatingRoom || error.message);
+      handleFirestoreError(error, OperationType.CREATE, 'rooms');
       return null;
     }
   };
