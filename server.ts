@@ -37,6 +37,52 @@ const server = http.createServer(app);
 
 app.use(express.json());
 
+// --- Maps Configuration ---
+let mapsConfig: Record<string, string> = {};
+
+function loadMapsConfig() {
+  const mapsPath = path.join(__dirname, 'data', 'maps.txt');
+  if (fs.existsSync(mapsPath)) {
+    try {
+      const content = fs.readFileSync(mapsPath, 'utf-8');
+      const lines = content.split('\n');
+      const newConfig: Record<string, string> = {};
+      lines.forEach(line => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine || trimmedLine.startsWith('#')) return;
+        
+        const colonIndex = trimmedLine.indexOf(':');
+        if (colonIndex !== -1) {
+          const key = trimmedLine.substring(0, colonIndex).trim();
+          const url = trimmedLine.substring(colonIndex + 1).trim();
+          if (key && url) {
+            newConfig[key] = url;
+          }
+        }
+      });
+      mapsConfig = newConfig;
+      console.log(`[MAPS] Loaded ${Object.keys(mapsConfig).length} map mappings from ${mapsPath}`);
+    } catch (err) {
+      console.error(`[MAPS] Error loading maps config:`, err);
+    }
+  } else {
+    console.warn(`[MAPS] maps.txt not found at ${mapsPath}`);
+  }
+}
+
+loadMapsConfig();
+
+// Watch for changes in maps.txt
+const mapsPath = path.join(__dirname, 'data', 'maps.txt');
+if (fs.existsSync(mapsPath)) {
+  fs.watch(mapsPath, (eventType) => {
+    if (eventType === 'change') {
+      console.log(`[MAPS] maps.txt changed, reloading...`);
+      loadMapsConfig();
+    }
+  });
+}
+
 // --- Email configuration ---
 const smtpPort = process.env.SMTP_PORT || '587';
 console.log(`[AUTH] SMTP Config: Host=${process.env.SMTP_HOST || 'smtp.gmail.com'}, Port=${smtpPort}, User=${process.env.SMTP_USER ? 'Set' : 'Not Set'}, Pass=${process.env.SMTP_PASS ? 'Set' : 'Not Set'}`);
@@ -268,10 +314,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
 });
 
 app.get("/api/maps", (req, res) => {
-  res.json({
-    "17": "https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&q=80&w=1200",
-    "18": "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=1200"
-  });
+  res.json(mapsConfig);
 });
 
 app.get("/api/health", (req, res) => {
