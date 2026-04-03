@@ -489,7 +489,7 @@ const Login = ({
       </motion.div>
     </div>
   );
-};;
+};
 
 const ManageUsersView = ({ lang, onBack }: { lang: string, onBack: () => void }) => {
   const t = translations[lang as keyof typeof translations];
