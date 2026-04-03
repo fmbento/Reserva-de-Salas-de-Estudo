@@ -197,9 +197,8 @@ app.post("/api/auth/send-otp", async (req, res) => {
       .from('otps')
       .upsert({
         email,
-        otp,
-        expires_at: expiresAt,
-        created_at: new Date().toISOString()
+        code: otp,
+        expires_at: expiresAt
       }, { onConflict: 'email' });
 
     if (error) throw error;
@@ -247,7 +246,7 @@ app.post("/api/auth/verify-otp", async (req, res) => {
       return res.status(400).json({ success: false, message: t.incorrectOtp });
     }
 
-    if (otpData.otp !== otp) {
+    if (otpData.code !== otp) {
       return res.status(400).json({ success: false, message: t.incorrectOtp });
     }
 

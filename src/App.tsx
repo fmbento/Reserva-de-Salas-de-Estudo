@@ -222,20 +222,22 @@ const Login = ({
             return;
           }
         } else {
-          userData = {
-            id: `ua_${btoa(email).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)}`,
+          const newUser = {
             name: email.split('@')[0],
             email: email,
             role: email === 'filben@gmail.com' ? 'admin' : 'user'
           };
-          const { error: insertError } = await supabase
+          const { data: insertedUser, error: insertError } = await supabase
             .from('users')
-            .insert(userData);
+            .insert(newUser)
+            .select()
+            .single();
 
           if (insertError) {
             handleSupabaseError(insertError, OperationType.WRITE, `users/${email}`);
             return;
           }
+          userData = insertedUser as UserData;
         }
         
         onLoginSuccess(userData);
@@ -1808,17 +1810,20 @@ export default function App() {
 
         const { data: reservationsData, error: reservationsError } = await supabase.from('reservations').select('*');
         if (reservationsError) throw reservationsError;
-        const mappedReservations = reservationsData.map((r: any) => ({
-          id: r.id,
-          roomId: r.roomId || r.room_id,
-          roomName: r.roomName || r.room_name || r.roomId,
-          userId: r.userId || r.user_id,
-          date: r.date,
-          startTime: r.startTime || r.start_time,
-          duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
-          subject: r.subject,
-          status: r.status
-        }));
+        const mappedReservations = reservationsData.map((r: any) => {
+          const room = mappedRooms.find((rm: any) => rm.id === (r.roomId || r.room_id));
+          return {
+            id: r.id,
+            roomId: r.roomId || r.room_id,
+            roomName: room?.name || r.roomId || r.room_id,
+            userId: r.userId || r.user_id,
+            date: r.date,
+            startTime: r.startTime || r.start_time,
+            duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
+            subject: r.subject,
+            status: r.status
+          };
+        });
         setReservations(mappedReservations);
       } catch (error) {
         console.error("Error fetching initial data:", error);
@@ -2039,19 +2044,17 @@ export default function App() {
     }
 
     try {
-      const newReservation = {
-        roomId: selectedRoomId,
-        userId: currentUser?.id || '1',
-        date: bookingDate,
-        startTime: activeStartTime,
-        duration: durationMins,
-        subject: bookingSubject,
-        status: 'Pending'
-      };
-
       const { error: insertError } = await supabase
         .from('reservations')
-        .insert(newReservation);
+        .insert({
+          room_id: selectedRoomId,
+          user_id: Number(currentUser?.id || '1'),
+          date: bookingDate,
+          start_time: activeStartTime,
+          duration: durationMins,
+          subject: bookingSubject,
+          status: 'Pending'
+        });
 
       if (insertError) throw insertError;
 
@@ -2094,7 +2097,7 @@ export default function App() {
       const { error: deleteError } = await supabase
         .from('reservations')
         .delete()
-        .eq('id', reservationToDelete);
+        .eq('id', Number(reservationToDelete));
 
       if (deleteError) throw deleteError;
 
@@ -2144,12 +2147,12 @@ export default function App() {
     }
   };
 
-  const handleUpdateReservationStatus = async (id: string, status: string) => {
+  const handleUpdateReservationStatus = async (id: any, status: string) => {
     try {
       const { error: updateError } = await supabase
         .from('reservations')
         .update({ status })
-        .eq('id', id);
+        .eq('id', Number(id));
 
       if (updateError) throw updateError;
 
@@ -2177,11 +2180,17 @@ export default function App() {
     }
   };
 
-  const handleUpdateRoom = async (roomId: string, updatedData: Partial<Room>) => {
+  const handleUpdateRoom = async (roomId: string, updatedData: any) => {
     try {
+      const mappedData = { ...updatedData };
+      if (mappedData.operationalStatus) {
+        mappedData.operational_status = mappedData.operationalStatus;
+        delete mappedData.operationalStatus;
+      }
+
       const { error: updateError } = await supabase
         .from('rooms')
-        .update(updatedData)
+        .update(mappedData)
         .eq('id', roomId);
 
       if (updateError) throw updateError;
@@ -2196,11 +2205,17 @@ export default function App() {
     }
   };
 
-  const handleCreateRoom = async (newRoomData: Partial<Room>) => {
+  const handleCreateRoom = async (newRoomData: any) => {
     try {
+      const mappedData = { ...newRoomData };
+      if (mappedData.operationalStatus) {
+        mappedData.operational_status = mappedData.operationalStatus;
+        delete mappedData.operationalStatus;
+      }
+
       const { data, error: insertError } = await supabase
         .from('rooms')
-        .insert(newRoomData)
+        .insert(mappedData)
         .select()
         .single();
 
