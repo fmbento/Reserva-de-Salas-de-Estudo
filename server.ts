@@ -233,10 +233,29 @@ app.post("/api/auth/send-otp", async (req, res) => {
     return res.status(400).json({ success: false, message: t.restrictedDomain });
   }
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otp = Math.floor(10000 + Math.random() * 90000).toString();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
 
   try {
+    // Check if user exists and is not blocked
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('role')
+      .eq('email', email)
+      .single();
+
+    if (userError && userError.code !== 'PGRST116') {
+      throw userError;
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: t.accountNotFound });
+    }
+
+    if (user.role === 'blocked') {
+      return res.status(403).json({ success: false, message: t.userBlockedError });
+    }
+
     console.log(`[AUTH] Attempting to store OTP for ${email} in Supabase`);
     // Store OTP in Supabase
     const { error } = await supabase

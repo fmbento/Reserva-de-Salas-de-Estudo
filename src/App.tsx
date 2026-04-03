@@ -158,7 +158,10 @@ const Login = ({
   const [error, setError] = useState('');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
-  const [step, setStep] = useState<'email' | 'otp'>('email');
+  const [step, setStep] = useState<'email' | 'otp' | 'register'>('email');
+  const [name, setName] = useState('');
+  const [otpValues, setOtpValues] = useState(['', '', '', '', '']);
+  const otpInputs = useRef<(HTMLInputElement | null)[]>([]);
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,6 +181,7 @@ const Login = ({
       const data = await response.json();
       if (data.success) {
         setStep('otp');
+        setOtpValues(['', '', '', '', '']);
       } else {
         setError(data.message || t.errorOccurred);
       }
@@ -188,59 +192,117 @@ const Login = ({
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.endsWith('@ua.pt') && email !== 'filben@gmail.com') {
+      setError(t.restrictedDomain);
+      return;
+    }
+    if (!name.trim()) {
+      setError(t.namePlaceholder);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (existingUser) {
+        setError(t.emailAlreadyRegistered);
+        setLoading(false);
+        return;
+      }
+
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          name,
+          email,
+          role: email === 'filben@gmail.com' ? 'admin' : 'user'
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        handleSupabaseError(insertError, OperationType.WRITE, `users/${email}`);
+        return;
+      }
+
+      // After registration, send OTP to login
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, lang })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStep('otp');
+        setOtpValues(['', '', '', '', '']);
+      } else {
+        setError(data.message || t.errorOccurred);
+      }
+    } catch (err: any) {
+      setError(t.connectionError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) value = value.slice(-1);
+    if (value && !/^\d$/.test(value)) return;
+
+    const newValues = [...otpValues];
+    newValues[index] = value;
+    setOtpValues(newValues);
+    setOtp(newValues.join(''));
+
+    if (value && index < 4) {
+      otpInputs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !otpValues[index] && index > 0) {
+      otpInputs.current[index - 1]?.focus();
+    }
+  };
+
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    const fullOtp = otpValues.join('');
+    if (fullOtp.length < 5) {
+      setError(t.enterOtp);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
       const response = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp, lang })
+        body: JSON.stringify({ email, otp: fullOtp, lang })
       });
       const data = await response.json();
       if (data.success) {
-        // Check if user exists in Supabase users table
         const { data: userSnap, error: fetchError } = await supabase
           .from('users')
           .select('*')
           .eq('email', email)
           .single();
 
-        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        if (fetchError) {
           handleSupabaseError(fetchError, OperationType.GET, `users/${email}`);
           return;
         }
         
-        let userData: UserData;
-        
-        if (userSnap) {
-          userData = userSnap as UserData;
-          if (userData.role === 'blocked') {
-            setError(t.userBlockedError);
-            setLoading(false);
-            return;
-          }
-        } else {
-          const newUser = {
-            name: email.split('@')[0],
-            email: email,
-            role: email === 'filben@gmail.com' ? 'admin' : 'user'
-          };
-          const { data: insertedUser, error: insertError } = await supabase
-            .from('users')
-            .insert(newUser)
-            .select()
-            .single();
-
-          if (insertError) {
-            handleSupabaseError(insertError, OperationType.WRITE, `users/${email}`);
-            return;
-          }
-          userData = insertedUser as UserData;
-        }
-        
-        onLoginSuccess(userData);
+        onLoginSuccess(userSnap as UserData);
       } else {
         setError(data.message || t.incorrectOtp);
       }
@@ -277,10 +339,10 @@ const Login = ({
           <span className="md:hidden">{t.loginTitleMobile}</span>
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 text-center">
-          {step === 'email' ? t.loginSubtitle : t.enterOtp}
+          {step === 'email' ? t.loginSubtitle : step === 'register' ? t.registerSubtitle : t.enterOtp}
         </p>
 
-        <form onSubmit={step === 'email' ? handleSendOtp : handleVerifyOtp} className="w-full space-y-4">
+        <form onSubmit={step === 'email' ? handleSendOtp : step === 'register' ? handleRegister : handleVerifyOtp} className="w-full space-y-4">
           {step === 'email' ? (
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">
@@ -298,22 +360,39 @@ const Login = ({
                 />
               </div>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">
-                {t.verifyOtp}
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input 
-                  type="text"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  placeholder="123456"
-                  maxLength={6}
-                  className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white text-center text-2xl tracking-widest font-bold"
-                  required
-                />
+          ) : step === 'register' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">
+                  {t.nameLabel}
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <input 
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t.namePlaceholder}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">
+                  {t.emailLabel}
+                </label>
+                <div className="relative">
+                  <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                  <input 
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="exemplo@ua.pt"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white"
+                    required
+                  />
+                </div>
               </div>
               <button 
                 type="button"
@@ -322,6 +401,45 @@ const Login = ({
               >
                 {t.backToLogin}
               </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1 block text-center">
+                {t.verifyOtp}
+              </label>
+              <div className="flex justify-between gap-2">
+                {otpValues.map((val, i) => (
+                  <input
+                    key={i}
+                    ref={(el) => (otpInputs.current[i] = el)}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d*"
+                    value={val}
+                    onChange={(e) => handleOtpChange(i, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(i, e)}
+                    className="w-12 h-16 text-center text-2xl font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white"
+                    maxLength={1}
+                    required
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between items-center px-1">
+                <button 
+                  type="button"
+                  onClick={() => setStep('email')}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  {t.backToLogin}
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleSendOtp}
+                  className="text-xs text-slate-500 hover:text-blue-600 transition-colors"
+                >
+                  {t.resendCode}
+                </button>
+              </div>
             </div>
           )}
 
@@ -345,15 +463,28 @@ const Login = ({
               <Loader2 className="animate-spin" size={20} />
             ) : (
               <>
-                {step === 'email' ? t.receiveOtp : t.verifyOtp}
+                {step === 'email' ? t.receiveOtp : step === 'register' ? t.register : t.verifyOtp}
                 <ChevronRight size={20} />
               </>
             )}
           </button>
+          
+          {step === 'email' && (
+            <div className="text-center">
+              <button 
+                type="button"
+                onClick={() => setStep('register')}
+                className="text-sm text-slate-500 hover:text-blue-600 transition-colors"
+              >
+                {t.noAccount} <span className="text-blue-600 font-semibold">{t.register}</span>
+              </button>
+            </div>
+          )}
         </form>
         
-        <div className="pt-8 border-t border-slate-100 dark:border-slate-800 text-center w-full mt-8">
+        <div className="pt-8 border-t border-slate-100 dark:border-slate-800 text-center w-full mt-8 flex flex-col gap-4">
           <p className="text-xs font-bold text-slate-300 dark:text-slate-600 tracking-widest uppercase">{t.restrictedDomain}</p>
+          <a href="#" className="text-xs text-slate-400 hover:text-blue-600 transition-colors">{t.helpAccess}</a>
         </div>
       </motion.div>
     </div>
