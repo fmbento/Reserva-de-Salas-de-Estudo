@@ -113,7 +113,7 @@ const LanguageToggle = ({ lang, setLang }: { lang: Language, setLang: (l: Langua
     {lang.toUpperCase()}
   </button>
 );
-import { auth, googleProvider, signInWithPopup, db, doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc, deleteDoc, addDoc, onSnapshot, signOut, onAuthStateChanged } from './firebase';
+import { supabase } from './supabase';
 
 enum OperationType {
   CREATE = 'create',
@@ -124,45 +124,19 @@ enum OperationType {
   WRITE = 'write',
 }
 
-interface FirestoreErrorInfo {
+interface SupabaseErrorInfo {
   error: string;
   operationType: OperationType;
   path: string | null;
-  authInfo: {
-    userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  }
 }
 
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
-    },
+function handleSupabaseError(error: any, operationType: OperationType, path: string | null) {
+  const errInfo: SupabaseErrorInfo = {
+    error: error?.message || String(error),
     operationType,
     path
   }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  console.error('Supabase Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -182,58 +156,94 @@ const Login = ({
   const t = translations[lang];
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState<'email' | 'otp'>('email');
 
-  const handleGoogleLogin = async () => {
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.endsWith('@ua.pt') && email !== 'filben@gmail.com') {
+      setError(t.restrictedDomain);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      
-      if (!user.email?.endsWith('@ua.pt') && user.email !== 'filben@gmail.com') {
-        setError(t.restrictedDomain);
-        setLoading(false);
-        return;
-      }
-
-      // Check if user exists in Firestore
-      const userRef = doc(db, 'users', user.uid);
-      let userSnap;
-      try {
-        userSnap = await getDoc(userRef);
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
-        return;
-      }
-      
-      let userData: UserData;
-      
-      if (userSnap.exists()) {
-        userData = userSnap.data() as UserData;
-        if (userData.role === 'blocked') {
-          setError(t.userBlockedError);
-          setLoading(false);
-          return;
-        }
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, lang })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStep('otp');
       } else {
-        userData = {
-          id: user.uid,
-          name: user.displayName || user.email?.split('@')[0] || 'User',
-          email: user.email || '',
-          role: user.email === 'filben@gmail.com' ? 'admin' : 'user'
-        };
-        try {
-          await setDoc(userRef, userData);
-        } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
+        setError(data.message || t.errorOccurred);
+      }
+    } catch (err: any) {
+      setError(t.connectionError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, lang })
+      });
+      const data = await response.json();
+      if (data.success) {
+        // Check if user exists in Supabase users table
+        const { data: userSnap, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .single();
+
+        if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          handleSupabaseError(fetchError, OperationType.GET, `users/${email}`);
           return;
         }
+        
+        let userData: UserData;
+        
+        if (userSnap) {
+          userData = userSnap as UserData;
+          if (userData.role === 'blocked') {
+            setError(t.userBlockedError);
+            setLoading(false);
+            return;
+          }
+        } else {
+          userData = {
+            id: `ua_${btoa(email).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20)}`,
+            name: email.split('@')[0],
+            email: email,
+            role: email === 'filben@gmail.com' ? 'admin' : 'user'
+          };
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert(userData);
+
+          if (insertError) {
+            handleSupabaseError(insertError, OperationType.WRITE, `users/${email}`);
+            return;
+          }
+        }
+        
+        onLoginSuccess(userData);
+      } else {
+        setError(data.message || t.incorrectOtp);
       }
-      
-      onLoginSuccess(userData);
     } catch (err: any) {
-      console.error(err);
-      setError(t.connectionError || err.message);
+      setError(t.connectionError);
     } finally {
       setLoading(false);
     }
@@ -265,23 +275,80 @@ const Login = ({
           <span className="md:hidden">{t.loginTitleMobile}</span>
         </h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 text-center">
-          {t.loginSubtitle}
+          {step === 'email' ? t.loginSubtitle : t.enterOtp}
         </p>
 
-        {error && (
-          <div className="w-full mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
-            <AlertCircle size={16} />
-            {error}
-          </div>
-        )}
+        <form onSubmit={step === 'email' ? handleSendOtp : handleVerifyOtp} className="w-full space-y-4">
+          {step === 'email' ? (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">
+                {t.emailLabel}
+              </label>
+              <div className="relative">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input 
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="exemplo@ua.pt"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white"
+                  required
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">
+                {t.verifyOtp}
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input 
+                  type="text"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="123456"
+                  maxLength={6}
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white text-center text-2xl tracking-widest font-bold"
+                  required
+                />
+              </div>
+              <button 
+                type="button"
+                onClick={() => setStep('email')}
+                className="text-xs text-blue-600 hover:underline ml-1"
+              >
+                {t.backToLogin}
+              </button>
+            </div>
+          )}
 
-        <button 
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-70"
-        >
-          {loading ? <Loader2 className="animate-spin" size={20} /> : 'Login com Google'}
-        </button>
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2 p-3 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 rounded-xl text-sm"
+            >
+              <AlertCircle size={16} />
+              {error}
+            </motion.div>
+          )}
+
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full py-4 bg-[#0066cc] hover:bg-[#0052a3] text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+          >
+            {loading ? (
+              <Loader2 className="animate-spin" size={20} />
+            ) : (
+              <>
+                {step === 'email' ? t.receiveOtp : t.verifyOtp}
+                <ChevronRight size={20} />
+              </>
+            )}
+          </button>
+        </form>
         
         <div className="pt-8 border-t border-slate-100 dark:border-slate-800 text-center w-full mt-8">
           <p className="text-xs font-bold text-slate-300 dark:text-slate-600 tracking-widest uppercase">{t.restrictedDomain}</p>
@@ -310,20 +377,25 @@ const ManageUsersView = ({ lang, onBack }: { lang: string, onBack: () => void })
     setFoundUser(null);
 
     try {
-      const q = query(collection(db, 'users'), where('email', '==', searchEmail));
-      const querySnapshot = await getDocs(q);
+      const { data, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', searchEmail)
+        .single();
 
-      if (querySnapshot.empty) {
-        throw new Error(t.errorOccurred); // Or a specific "user not found" message if available in translations
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          throw new Error(t.errorOccurred);
+        }
+        handleSupabaseError(fetchError, OperationType.GET, 'users');
       }
 
-      const userDoc = querySnapshot.docs[0];
-      setFoundUser({ id: userDoc.id, ...userDoc.data() } as UserData);
+      setFoundUser(data as UserData);
     } catch (err: any) {
       if (err.message === t.errorOccurred) {
         setError(err.message);
       } else {
-        handleFirestoreError(err, OperationType.LIST, 'users');
+        setError(t.errorOccurred);
       }
     } finally {
       setIsSearching(false);
@@ -338,13 +410,19 @@ const ManageUsersView = ({ lang, onBack }: { lang: string, onBack: () => void })
     setSuccess(null);
 
     try {
-      const userRef = doc(db, 'users', foundUser.id);
-      await updateDoc(userRef, { role: newRole });
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ role: newRole })
+        .eq('id', foundUser.id);
+
+      if (updateError) {
+        handleSupabaseError(updateError, OperationType.UPDATE, `users/${foundUser.id}`);
+      }
 
       setFoundUser({ ...foundUser, role: newRole as any });
       setSuccess(t.userUpdatedSuccess || 'Role updated successfully');
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${foundUser.id}`);
+      setError(t.errorOccurred);
     } finally {
       setIsUpdating(false);
     }
@@ -1678,34 +1756,20 @@ export default function App() {
       const user = JSON.parse(savedUser);
       setCurrentUser(user);
       setIsLoggedIn(true);
+      setIsAuthReady(true);
+    } else {
+      setIsAuthReady(true);
     }
-    
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setIsAuthReady(true);
-      } else {
-        setIsAuthReady(false);
-        setIsLoggedIn(false);
-        setCurrentUser(null);
-        localStorage.removeItem('sirs_user');
-      }
-    });
-
-    return () => unsubscribe();
   }, []);
 
   const handleLoginSuccess = (user: UserData) => {
     localStorage.setItem('sirs_user', JSON.stringify(user));
     setCurrentUser(user);
     setIsLoggedIn(true);
+    setIsAuthReady(true);
   };
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
     localStorage.removeItem('sirs_user');
     setIsLoggedIn(false);
     setCurrentUser(null);
@@ -1724,50 +1788,64 @@ export default function App() {
       .then(data => setFloorPlanMaps(data))
       .catch(err => console.error("Failed to fetch maps:", err));
 
-    const unsubRooms = onSnapshot(collection(db, 'rooms'), (snapshot) => {
-      const roomsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const mappedRooms = roomsData.map((r: any) => ({
-        ...r,
-        operationalStatus: r.operationalStatus || r.operational_status || 'Active',
-        amenities: Array.isArray(r.amenities) ? r.amenities : (r.amenities ? JSON.parse(r.amenities) : ['Eduroam', 'Tomadas']),
-        image: r.image || 'https://picsum.photos/seed/' + r.id + '/800/600',
-        top: r.top || (r.id === '101' ? '20%' : r.id === '102' ? '20%' : r.id === '201' ? '50%' : '70%'),
-        left: r.left || (r.id === '101' ? '15%' : r.id === '102' ? '30%' : r.id === '201' ? '45%' : '70%')
-      }));
-      setRooms(mappedRooms);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'rooms');
-    });
+    const fetchInitialData = async () => {
+      try {
+        const { data: roomsData, error: roomsError } = await supabase.from('rooms').select('*');
+        if (roomsError) throw roomsError;
+        const mappedRooms = roomsData.map((r: any) => ({
+          ...r,
+          operationalStatus: r.operationalStatus || r.operational_status || 'Active',
+          amenities: Array.isArray(r.amenities) ? r.amenities : (r.amenities ? JSON.parse(r.amenities) : ['Eduroam', 'Tomadas']),
+          image: r.image || 'https://picsum.photos/seed/' + r.id + '/800/600',
+          top: r.top || (r.id === '101' ? '20%' : r.id === '102' ? '20%' : r.id === '201' ? '50%' : '70%'),
+          left: r.left || (r.id === '101' ? '15%' : r.id === '102' ? '30%' : r.id === '201' ? '45%' : '70%')
+        }));
+        setRooms(mappedRooms);
 
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      setAllUsers(usersData);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'users');
-    });
+        const { data: usersData, error: usersError } = await supabase.from('users').select('*');
+        if (usersError) throw usersError;
+        setAllUsers(usersData);
 
-    const unsubReservations = onSnapshot(collection(db, 'reservations'), (snapshot) => {
-      const reservationsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const mappedReservations = reservationsData.map((r: any) => ({
-        id: r.id,
-        roomId: r.roomId || r.room_id,
-        roomName: r.roomName || r.room_name || r.roomId,
-        userId: r.userId || r.user_id,
-        date: r.date,
-        startTime: r.startTime || r.start_time,
-        duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
-        subject: r.subject,
-        status: r.status
-      }));
-      setReservations(mappedReservations);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'reservations');
-    });
+        const { data: reservationsData, error: reservationsError } = await supabase.from('reservations').select('*');
+        if (reservationsError) throw reservationsError;
+        const mappedReservations = reservationsData.map((r: any) => ({
+          id: r.id,
+          roomId: r.roomId || r.room_id,
+          roomName: r.roomName || r.room_name || r.roomId,
+          userId: r.userId || r.user_id,
+          date: r.date,
+          startTime: r.startTime || r.start_time,
+          duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
+          subject: r.subject,
+          status: r.status
+        }));
+        setReservations(mappedReservations);
+      } catch (error) {
+        console.error("Error fetching initial data:", error);
+      }
+    };
+
+    fetchInitialData();
+
+    const roomsSubscription = supabase
+      .channel('rooms-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => fetchInitialData())
+      .subscribe();
+
+    const usersSubscription = supabase
+      .channel('users-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchInitialData())
+      .subscribe();
+
+    const reservationsSubscription = supabase
+      .channel('reservations-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => fetchInitialData())
+      .subscribe();
 
     return () => {
-      unsubRooms();
-      unsubUsers();
-      unsubReservations();
+      supabase.removeChannel(roomsSubscription);
+      supabase.removeChannel(usersSubscription);
+      supabase.removeChannel(reservationsSubscription);
     };
   }, [isLoggedIn, isAuthReady]);
 
@@ -1971,7 +2049,11 @@ export default function App() {
         status: 'Pending'
       };
 
-      await addDoc(collection(db, 'reservations'), newReservation);
+      const { error: insertError } = await supabase
+        .from('reservations')
+        .insert(newReservation);
+
+      if (insertError) throw insertError;
 
       fetch('/api/emails/reservation-pending', {
         method: 'POST',
@@ -1993,7 +2075,7 @@ export default function App() {
     } catch (error: any) {
       setBookingStatus('error');
       setBookingMessage(error.message || 'Lamentamos, mas ocorreu um erro ao processar a sua reserva.');
-      handleFirestoreError(error, OperationType.CREATE, 'reservations');
+      handleSupabaseError(error, OperationType.CREATE, 'reservations');
     }
   };
 
@@ -2009,7 +2091,12 @@ export default function App() {
       const res = reservations.find(r => r.id === reservationToDelete);
       const user = allUsers.find(u => u.id === res?.userId);
 
-      await deleteDoc(doc(db, 'reservations', reservationToDelete));
+      const { error: deleteError } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', reservationToDelete);
+
+      if (deleteError) throw deleteError;
 
       if (res && user) {
         fetch('/api/emails/reservation-status', {
@@ -2030,19 +2117,20 @@ export default function App() {
       setBookingMessage(t.reservationDeletedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `reservations/${reservationToDelete}`);
+      handleSupabaseError(error, OperationType.DELETE, `reservations/${reservationToDelete}`);
     }
   };
 
   const handleSwitchUser = async (email: string) => {
     try {
-      const q = query(collection(db, 'users'), where('email', '==', email));
-      const querySnapshot = await getDocs(q);
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
       
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        const userData = { id: userDoc.id, ...userDoc.data() } as UserData;
-        setCurrentUser(userData);
+      if (userData) {
+        setCurrentUser(userData as UserData);
         setShowUserSwitcher(false);
         
         if (userData.role === 'bibliotecário' || userData.role === 'admin') {
@@ -2052,13 +2140,18 @@ export default function App() {
         }
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.LIST, 'users');
+      handleSupabaseError(error, OperationType.LIST, 'users');
     }
   };
 
   const handleUpdateReservationStatus = async (id: string, status: string) => {
     try {
-      await updateDoc(doc(db, 'reservations', id), { status });
+      const { error: updateError } = await supabase
+        .from('reservations')
+        .update({ status })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
 
       const res = reservations.find(r => r.id === id);
       const user = allUsers.find(u => u.id === res?.userId);
@@ -2080,13 +2173,18 @@ export default function App() {
       setBookingMessage(status === 'Confirmed' ? t.reservationApprovedSuccess : t.reservationRejectedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `reservations/${id}`);
+      handleSupabaseError(error, OperationType.UPDATE, `reservations/${id}`);
     }
   };
 
   const handleUpdateRoom = async (roomId: string, updatedData: Partial<Room>) => {
     try {
-      await updateDoc(doc(db, 'rooms', roomId), updatedData);
+      const { error: updateError } = await supabase
+        .from('rooms')
+        .update(updatedData)
+        .eq('id', roomId);
+
+      if (updateError) throw updateError;
 
       setBookingStatus('success');
       setBookingMessage(t.roomUpdatedSuccess);
@@ -2094,22 +2192,28 @@ export default function App() {
     } catch (error: any) {
       setBookingStatus('error');
       setBookingMessage(t.errorUpdatingRoom || error.message);
-      handleFirestoreError(error, OperationType.UPDATE, `rooms/${roomId}`);
+      handleSupabaseError(error, OperationType.UPDATE, `rooms/${roomId}`);
     }
   };
 
   const handleCreateRoom = async (newRoomData: Partial<Room>) => {
     try {
-      const docRef = await addDoc(collection(db, 'rooms'), newRoomData);
+      const { data, error: insertError } = await supabase
+        .from('rooms')
+        .insert(newRoomData)
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
       
       setBookingStatus('success');
       setBookingMessage(t.roomCreatedSuccess);
       setTimeout(() => setBookingStatus('idle'), 3000);
-      return { id: docRef.id, ...newRoomData };
+      return data;
     } catch (error: any) {
       setBookingStatus('error');
       setBookingMessage(t.errorCreatingRoom || error.message);
-      handleFirestoreError(error, OperationType.CREATE, 'rooms');
+      handleSupabaseError(error, OperationType.CREATE, 'rooms');
       return null;
     }
   };

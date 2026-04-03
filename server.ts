@@ -7,6 +7,7 @@ import nodemailer from "nodemailer";
 import * as ics from 'ics';
 import http from "http";
 import { translations, Language } from "./translations.js";
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,6 +19,17 @@ if (fs.existsSync(envPath)) {
   console.log(`[AUTH] .env file loaded from ${envPath}`);
 } else {
   console.warn(`[AUTH] .env file not found at ${envPath}`);
+}
+
+// Initialize Supabase
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn("[AUTH] Supabase URL or Service Role Key not set. Authentication will fail.");
+} else {
+  console.log("[AUTH] Supabase client initialized.");
 }
 
 const app = express();
@@ -164,6 +176,96 @@ app.post("/api/emails/reservation-status", async (req, res) => {
   const { email, roomName, reservation, status, lang } = req.body;
   await sendReservationStatusEmail(email, roomName, reservation, status, lang);
   res.status(200).json({ success: true });
+});
+
+// --- OTP Authentication ---
+app.post("/api/auth/send-otp", async (req, res) => {
+  const { email, lang } = req.body;
+  const t = translations[lang as Language];
+
+  if (!email || (!email.endsWith('@ua.pt') && email !== 'filben@gmail.com')) {
+    return res.status(400).json({ success: false, message: t.restrictedDomain });
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+
+  try {
+    console.log(`[AUTH] Attempting to store OTP for ${email} in Supabase`);
+    // Store OTP in Supabase
+    const { error } = await supabase
+      .from('otps')
+      .upsert({
+        email,
+        otp,
+        expires_at: expiresAt,
+        created_at: new Date().toISOString()
+      }, { onConflict: 'email' });
+
+    if (error) throw error;
+    
+    console.log(`[AUTH] OTP stored successfully for ${email}`);
+
+    // Send OTP via email
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: `SiReS: ${t.verifyOtp}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
+          <p>${t.otpSent}</p>
+          <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
+            <h1 style="font-size: 32px; letter-spacing: 5px; margin: 0; color: #0066cc;">${otp}</h1>
+          </div>
+          <p style="font-size: 12px; color: #999; text-align: center;">${t.expiredOtp} (5 min)</p>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
+        </div>
+      `,
+    });
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("[AUTH] Failed to send OTP:", error);
+    res.status(500).json({ success: false, message: t.errorOccurred });
+  }
+});
+
+app.post("/api/auth/verify-otp", async (req, res) => {
+  const { email, otp, lang } = req.body;
+  const t = translations[lang as Language];
+
+  try {
+    const { data: otpData, error: fetchError } = await supabase
+      .from('otps')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (fetchError || !otpData) {
+      return res.status(400).json({ success: false, message: t.incorrectOtp });
+    }
+
+    if (otpData.otp !== otp) {
+      return res.status(400).json({ success: false, message: t.incorrectOtp });
+    }
+
+    if (new Date() > new Date(otpData.expires_at)) {
+      return res.status(400).json({ success: false, message: t.expiredOtp });
+    }
+
+    // Delete OTP after successful verification
+    await supabase.from('otps').delete().eq('email', email);
+
+    // In Supabase, we can use the email to identify the user
+    // We'll return a simple success for now, or we could generate a JWT if needed
+    // But since we're removing Firebase Auth, we'll just return success and the user info
+    res.status(200).json({ success: true, email });
+  } catch (error) {
+    console.error("[AUTH] Failed to verify OTP:", error);
+    res.status(500).json({ success: false, message: t.errorOccurred });
+  }
 });
 
 app.get("/api/maps", (req, res) => {

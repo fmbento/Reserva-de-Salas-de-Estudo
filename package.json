@@ -15,12 +15,12 @@
   },
   "dependencies": {
     "@google/genai": "latest",
+    "@supabase/supabase-js": "^2.101.1",
     "@vercel/blob": "^2.3.2",
     "clsx": "latest",
     "d3": "latest",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "firebase": "^12.11.0",
     "ics": "^3.8.1",
     "js-cookie": "^3.0.5",
     "lucide-react": "latest",
