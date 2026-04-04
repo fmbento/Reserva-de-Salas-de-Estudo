@@ -245,6 +245,7 @@ export interface TranslationKeys {
   emailDate: string;
   emailTime: string;
   emailFooter: string;
+  close: string;
 }
 
 export const translations: Record<Language, TranslationKeys> = {
@@ -492,7 +493,8 @@ export const translations: Record<Language, TranslationKeys> = {
     emailRoom: "Sala",
     emailDate: "Data",
     emailTime: "Hora",
-    emailFooter: "Sistema de Reserva de Salas - Universidade de Aveiro"
+    emailFooter: "Sistema de Reserva de Salas - Universidade de Aveiro",
+    close: "Fechar",
   },
   en: {
     loginTitle: "Welcome back",
@@ -738,6 +740,7 @@ export const translations: Record<Language, TranslationKeys> = {
     emailRoom: "Room",
     emailDate: "Date",
     emailTime: "Time",
-    emailFooter: "Room Booking System - University of Aveiro"
+    emailFooter: "Room Booking System - University of Aveiro",
+    close: "Close",
   }
 };

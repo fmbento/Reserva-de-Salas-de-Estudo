@@ -10,9 +10,9 @@ The system features:
 - 📧 Email notifications for reservations
 - 🗓️ Calendar integration (ICS format)
 - 👥 Role-based access control (User, Librarian, Admin)
-- 🌐 WebSocket support for real-time updates
+- 🌐 Supabase integration for data persistence and real-time features
 - 🎨 Official UA branding and improved Dark Mode
-- 📱 Responsive web interface
+- 📱 Responsive web interface with mobile-optimized bottom sheets
 - 🐳 Docker support for easy deployment
 
 ---
@@ -64,20 +64,20 @@ The application will be available at `http://localhost:3000`
 
 ## 🔼 Vercel Deployment
 
-This application is optimized for Vercel deployment using **Vercel Blob Storage** for SQLite persistence.
+This application is optimized for Vercel deployment using **Supabase** for data persistence.
 
 ### Steps to Deploy
 
 1. **Create a Vercel Project** and link it to your repository.
-2. **Enable Vercel Blob Storage** in your Vercel project settings.
+2. **Set up a Supabase project** and obtain your URL and API keys.
 3. **Configure Environment Variables** in Vercel (see below).
 4. **Deploy!** Vercel will automatically use `vercel.json` for configuration.
 
 ### Required Vercel Environment Variables
 
-- `DEPLOY_TO=vercel`
-- `BLOB_READ_WRITE_TOKEN`: Automatically provided by Vercel when Blob is enabled.
-- `DATABASE_BLOB_URL`: URL to your `salas.db` file in Vercel Blob storage (optional, for initial fetch).
+- `VITE_SUPABASE_URL`: Your Supabase project URL.
+- `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous key (for client-side).
+- `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service role key (for server-side).
 - `ADMIN_EMAIL`: Your admin email.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`: Email configuration.
 
@@ -85,13 +85,10 @@ This application is optimized for Vercel deployment using **Vercel Blob Storage*
 
 If you encounter a `500: INTERNAL_SERVER_ERROR` or `FUNCTION_INVOCATION_FAILED` on Vercel:
 
-1. **Check Environment Variables**: Ensure all `SMTP_*` and `ADMIN_EMAIL` variables are correctly set in the Vercel Dashboard.
-2. **Vercel Blob Token**: Verify that `BLOB_READ_WRITE_TOKEN` is present in your environment variables. It should be added automatically when you enable Vercel Blob.
-3. **Database Initialization**: The first request might take longer as it downloads the database from Vercel Blob. If it times out, try refreshing.
-4. **Native Modules**: `better-sqlite3` is a native module. If deployment fails, ensure your Node.js version in Vercel matches your local environment (recommended: Node 20.x).
-5. **Logs**: Check the **Logs** tab in your Vercel deployment to see the specific error message.
-
-**Note:** WebSockets are automatically disabled when running on Vercel to maintain compatibility with serverless functions.
+1. **Check Environment Variables**: Ensure all `VITE_SUPABASE_*`, `SUPABASE_SERVICE_ROLE_KEY`, `SMTP_*`, and `ADMIN_EMAIL` variables are correctly set in the Vercel Dashboard.
+2. **Supabase Connectivity**: Verify that your Supabase project is active and the keys are correct.
+3. **Native Modules**: If deployment fails, ensure your Node.js version in Vercel matches your local environment (recommended: Node 20.x).
+4. **Logs**: Check the **Logs** tab in your Vercel deployment to see the specific error message.
 
 ---
 
@@ -129,6 +126,11 @@ PORT=3000
 
 # Authentication
 ADMIN_EMAIL=sbidm-biblioteca@ua.pt
+
+# Supabase (Database)
+VITE_SUPABASE_URL=your-supabase-url
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
 # Email (SMTP)
 SMTP_HOST=smtp.gmail.com
@@ -214,65 +216,47 @@ npm run preview
 
 ## 💾 Database
 
-The application uses **SQLite** (`better-sqlite3`) for data persistence. The database is automatically created and initialized on first run.
+The application uses **Supabase** for data persistence and real-time features. The database schema is managed in Supabase.
 
-### Database Schema
+### Database Tables
 
 #### Users Table
-```sql
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  role TEXT DEFAULT 'user' -- 'user', 'bibliotecário', 'admin', 'blocked'
-);
-```
+- `id`: UUID (Primary Key)
+- `name`: Text
+- `email`: Text (Unique)
+- `role`: Text (Default: 'user')
 
 #### Rooms Table
-```sql
-CREATE TABLE rooms (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  building TEXT DEFAULT '',
-  floor TEXT DEFAULT '',
-  section TEXT DEFAULT '',
-  department TEXT NOT NULL,
-  status TEXT NOT NULL,
-  capacity INTEGER,
-  description TEXT,
-  operational_status TEXT DEFAULT 'Active',
-  image TEXT,
-  amenities TEXT DEFAULT '[]',
-  top TEXT,
-  left TEXT
-);
-```
+- `id`: Text (Primary Key)
+- `name`: Text
+- `building`: Text
+- `floor`: Text
+- `section`: Text
+- `department`: Text
+- `status`: Text
+- `capacity`: Integer
+- `description`: Text
+- `operational_status`: Text (Default: 'Active')
+- `image`: Text
+- `amenities`: JSONB (Default: '[]')
+- `top`: Text
+- `left`: Text
 
 #### Reservations Table
-```sql
-CREATE TABLE reservations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  room_id TEXT NOT NULL,
-  user_id INTEGER NOT NULL,
-  date TEXT NOT NULL,
-  start_time TEXT NOT NULL,
-  duration INTEGER NOT NULL,
-  subject TEXT NOT NULL,
-  status TEXT DEFAULT 'Pending',
-  FOREIGN KEY (room_id) REFERENCES rooms(id),
-  FOREIGN KEY (user_id) REFERENCES users(id)
-);
-```
+- `id`: UUID (Primary Key)
+- `room_id`: Text (Foreign Key)
+- `user_id`: UUID (Foreign Key)
+- `date`: Date
+- `start_time`: Time
+- `duration`: Integer
+- `subject`: Text
+- `status`: Text (Default: 'Pending')
 
 #### OTPs Table
-```sql
-CREATE TABLE otps (
-  email TEXT PRIMARY KEY,
-  code TEXT NOT NULL,
-  name TEXT,
-  expires_at DATETIME NOT NULL
-);
-```
+- `email`: Text (Primary Key)
+- `code`: Text
+- `name`: Text
+- `expires_at`: Timestamp
 
 ---
 
@@ -366,9 +350,8 @@ Connected clients receive instant updates without page refresh.
 ### Backend
 - **Express.js** - Web framework
 - **TypeScript** - Type safety
-- **SQLite** - Database
+- **Supabase** - Database and Real-time
 - **Nodemailer** - Email service
-- **WebSocket** - Real-time communication
 - **ICS** - Calendar file generation
 - **Google Generative AI** - AI integration
 
@@ -422,6 +405,13 @@ For support, please contact:
 ---
 
 ## 🔄 Changelog
+
+### Version 0.5.0 (April 4, 2026)
+- **Database Migration**: Switched from SQLite and Vercel Blob to **Supabase** for improved scalability, persistence, and real-time capabilities.
+- **Supabase Integration**: Added `@supabase/supabase-js` and configured both client and server to use Supabase.
+- **Mobile UI Improvement**: Added a "Fechar" (Close) button to the mobile bottom sheet for room and reservation details, improving mobile UX.
+- **Internationalization**: Added `close` translation key for Portuguese and English.
+- **Vercel Deployment**: Updated deployment instructions to reflect the switch to Supabase.
 
 ### Version 0.4.4 (March 29, 2026)
 - **Vercel Module Resolution Fix**: Moved `translations.ts` to the project root and updated imports to use the `.js` extension. This ensures compatibility with Node.js ESM in Vercel's serverless environment, where `.ts` files are compiled to `.js` and standard Node.js module resolution is enforced.
@@ -487,7 +477,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** March 29, 2026
+**Last Updated:** April 4, 2026
 ```
 
 This README provides:

@@ -3082,6 +3082,14 @@ export default function App() {
                     className="md:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-[32px] z-50 max-h-[90vh] overflow-y-auto pb-20"
                   >
                     <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto my-4" />
+                    <div className="flex justify-center mb-2">
+                      <button 
+                        onClick={() => setMobileShowDetails(false)}
+                        className="text-primary font-bold text-xs uppercase tracking-widest hover:opacity-80 transition-opacity px-4 py-1"
+                      >
+                        {t.close}
+                      </button>
+                    </div>
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div>
