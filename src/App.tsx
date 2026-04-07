@@ -94,10 +94,12 @@ interface UserData {
   role: 'user' | 'bibliotecário' | 'admin' | 'blocked';
 }
 
-const getLisbonNow = () => {
+const APP_TIMEZONE = import.meta.env.VITE_TIME_ZONE || 'Europe/Lisbon';
+
+const getAppNow = () => {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Lisbon',
+    timeZone: APP_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -119,19 +121,19 @@ const getLisbonNow = () => {
   );
 };
 
-const getLisbonDate = (date: Date = getLisbonNow()) => {
+const getAppDate = (date: Date = getAppNow()) => {
   const y = date.getFullYear();
   const m = (date.getMonth() + 1).toString().padStart(2, '0');
   const d = date.getDate().toString().padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
 
-const getLisbonNextSlot = () => {
-  const lisbonNow = getLisbonNow();
-  const minute = lisbonNow.getMinutes();
+const getAppNextSlot = () => {
+  const appNow = getAppNow();
+  const minute = appNow.getMinutes();
   
   const minutesToNextSlot = 15 - (minute % 15);
-  const nextSlotDate = new Date(lisbonNow.getTime() + minutesToNextSlot * 60000);
+  const nextSlotDate = new Date(appNow.getTime() + minutesToNextSlot * 60000);
   
   const y = nextSlotDate.getFullYear();
   const m = (nextSlotDate.getMonth() + 1).toString().padStart(2, '0');
@@ -767,11 +769,11 @@ const BackofficeView = ({
 }) => {
   const t = translations[lang as keyof typeof translations];
   const AVAILABLE_AMENITIES = getAvailableAmenities(t);
-  const now = getLisbonNow();
+  const now = getAppNow();
   
   const futureReservations = reservations.filter(res => {
     const resDateTime = new Date(`${res.date}T${res.startTime}`);
-    return resDateTime >= now || res.date === getLisbonDate(now);
+    return resDateTime >= now || res.date === getAppDate(now);
   }).sort((a, b) => new Date(`${a.date}T${a.startTime}`).getTime() - new Date(`${b.date}T${b.startTime}`).getTime());
 
   return (
@@ -1424,7 +1426,7 @@ const SchedulesView = ({
   lang: string
 }) => {
   const t = translations[lang as keyof typeof translations];
-  const [currentDate, setCurrentDate] = useState(getLisbonNow());
+  const [currentDate, setCurrentDate] = useState(getAppNow());
   const [roomSearch, setRoomSearch] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
@@ -1460,7 +1462,7 @@ const SchedulesView = ({
   };
 
   const isSlotInPast = (dayIndex: number, hourStr: string, minute: number) => {
-    const now = getLisbonNow();
+    const now = getAppNow();
     const slotDate = new Date(currentDate);
     // Logic to get the date of the specific dayIndex (0=Mon, 6=Sun)
     slotDate.setDate(slotDate.getDate() - (slotDate.getDay() === 0 ? 6 : slotDate.getDay() - 1) + dayIndex);
@@ -1898,7 +1900,7 @@ export default function App() {
   const [selectedFloor, setSelectedFloor] = useState('2');
   const [selectedSection, setSelectedSection] = useState('Trás');
 
-  const initialSlot = useMemo(() => getLisbonNextSlot(), []);
+  const initialSlot = useMemo(() => getAppNextSlot(), []);
 
   const filteredRoomsForMap = useMemo(() => {
     return rooms.filter(room => 
@@ -2079,7 +2081,7 @@ export default function App() {
       );
 
   const handleConfirmBooking = async (forcedDuration?: number, forcedStartTime?: string) => {
-    const now = getLisbonNow();
+    const now = getAppNow();
     const activeStartTime = forcedStartTime || bookingStartTime;
     const [h, m] = activeStartTime.split(':').map(Number);
     const bDate = new Date(bookingDate + 'T00:00:00');
@@ -2838,7 +2840,7 @@ export default function App() {
                     <div className="space-y-10">
                       {/* Process reservations with current time logic */}
                       {(() => {
-                        const now = getLisbonNow();
+                        const now = getAppNow();
                         
                         const processedReservations = reservations
                           .filter(r => r.userId === currentUser?.id)
@@ -3025,7 +3027,7 @@ export default function App() {
                               value={bookingDate}
                               onChange={(e) => setBookingDate(e.target.value)}
                               className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
-                              min={getLisbonDate()}
+                              min={getAppDate()}
                             />
                           </div>
                           
@@ -3079,7 +3081,7 @@ export default function App() {
                               selectedRoom.operationalStatus !== 'Active' ||
                               getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
                               (() => {
-                                const now = getLisbonNow();
+                                const now = getAppNow();
                                 const [h, m] = bookingStartTime.split(':').map(Number);
                                 const bDate = new Date(bookingDate + 'T00:00:00');
                                 bDate.setHours(h, m, 0, 0);
@@ -3090,7 +3092,7 @@ export default function App() {
                               selectedRoom.operationalStatus !== 'Active' ||
                               getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
                               (() => {
-                                const now = getLisbonNow();
+                                const now = getAppNow();
                                 const [h, m] = bookingStartTime.split(':').map(Number);
                                 const bDate = new Date(bookingDate + 'T00:00:00');
                                 bDate.setHours(h, m, 0, 0);
@@ -3198,7 +3200,7 @@ export default function App() {
                               value={bookingDate}
                               onChange={(e) => setBookingDate(e.target.value)}
                               className="absolute inset-0 opacity-0 cursor-pointer z-20 w-full h-full appearance-none"
-                              min={getLisbonDate()}
+                              min={getAppDate()}
                             />
                           </div>
                           <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative">
@@ -3253,7 +3255,7 @@ export default function App() {
                           selectedRoom.operationalStatus !== 'Active' ||
                           getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
                           (() => {
-                            const now = getLisbonNow();
+                            const now = getAppNow();
                             const [h, m] = bookingStartTime.split(':').map(Number);
                             const bDate = new Date(bookingDate + 'T00:00:00');
                             bDate.setHours(h, m, 0, 0);
@@ -3264,7 +3266,7 @@ export default function App() {
                           selectedRoom.operationalStatus !== 'Active' ||
                           getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
                           (() => {
-                            const now = getLisbonNow();
+                            const now = getAppNow();
                             const [h, m] = bookingStartTime.split(':').map(Number);
                             const bDate = new Date(bookingDate + 'T00:00:00');
                             bDate.setHours(h, m, 0, 0);
