@@ -147,6 +147,59 @@ const getAppNextSlot = () => {
   };
 };
 
+const OPERATING_HOURS = (() => {
+  try {
+    const raw = import.meta.env.VITE_OPERATING_HOURS || '{}';
+    // Remove single quotes if they wrap the JSON string (common in .env)
+    const cleaned = raw.startsWith("'") && raw.endsWith("'") ? raw.slice(1, -1) : raw;
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("Failed to parse VITE_OPERATING_HOURS:", e);
+    return {};
+  }
+})();
+
+const MAX_BOOKING_DURATION_MINS = parseInt(import.meta.env.VITE_MAX_BOOKING_DURATION_MINS || '240');
+
+const isTimeAllowed = (buildingId: string, dateStr: string, timeStr: string) => {
+  const hoursConfig = OPERATING_HOURS[buildingId];
+  if (!hoursConfig) return true;
+
+  const date = new Date(dateStr + 'T00:00:00');
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const dayName = dayNames[date.getDay()];
+  
+  const dayHours = hoursConfig[dayName];
+  if (!dayHours) return false;
+
+  const [start, end] = dayHours.split('-');
+  const [startH, startM] = start.split(':').map(Number);
+  const [endH, endM] = end.split(':').map(Number);
+  const [currentH, currentM] = timeStr.split(':').map(Number);
+
+  const startTotal = startH * 60 + startM;
+  const endTotal = endH * 60 + endM;
+  const currentTotal = currentH * 60 + currentM;
+
+  return currentTotal >= startTotal && currentTotal <= endTotal;
+};
+
+const DURATION_OPTIONS = [
+  { label: '15 Minutos', value: '15 Minutos', mins: 15 },
+  { label: '30 Minutos', value: '30 Minutos', mins: 30 },
+  { label: '45 Minutos', value: '45 Minutos', mins: 45 },
+  { label: '1 Hora', value: '1 Hora', mins: 60 },
+  { label: '1 Hora e 15', value: '1 Hora e 15', mins: 75 },
+  { label: '1 Hora e 30', value: '1 Hora e 30', mins: 90 },
+  { label: '1 Hora e 45', value: '1 Hora e 45', mins: 105 },
+  { label: '2 Horas', value: '2 Horas', mins: 120 },
+  { label: '2 Horas e 15', value: '2 Horas e 15', mins: 135 },
+  { label: '2 Horas e 30', value: '2 Horas e 30', mins: 150 },
+  { label: '2 Horas e 45', value: '2 Horas e 45', mins: 165 },
+  { label: '3 Horas', value: '3 Horas', mins: 180 },
+  { label: '4 Horas', value: '4 Horas', mins: 240 },
+];
+
 const ThemeToggle = ({ theme, toggleTheme }: { theme: 'light' | 'dark', toggleTheme: () => void }) => (
   <button
     onClick={toggleTheme}
@@ -1924,6 +1977,28 @@ export default function App() {
   const [bookingStartTime, setBookingStartTime] = useState<string>(initialSlot.time);
   const [bookingDuration, setBookingDuration] = useState<string>('1 Hora');
   const [bookingSubject, setBookingSubject] = useState<string>('');
+
+  useEffect(() => {
+    if (!isTimeAllowed(selectedBuilding, bookingDate, bookingStartTime)) {
+      for (let h = 8; h < 24; h++) {
+        for (let m = 0; m < 60; m += 15) {
+          const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          if (isTimeAllowed(selectedBuilding, bookingDate, time)) {
+            setBookingStartTime(time);
+            return;
+          }
+        }
+      }
+    }
+  }, [selectedBuilding, bookingDate, bookingStartTime]);
+
+  useEffect(() => {
+    const durationOpt = DURATION_OPTIONS.find(opt => opt.value === bookingDuration);
+    if (durationOpt && durationOpt.mins > MAX_BOOKING_DURATION_MINS) {
+      const firstValid = DURATION_OPTIONS.find(opt => opt.mins <= MAX_BOOKING_DURATION_MINS);
+      if (firstValid) setBookingDuration(firstValid.value);
+    }
+  }, [bookingDuration]);
   
   const [reservationToDelete, setReservationToDelete] = useState<string | null>(null);
   const [conflictModal, setConflictModal] = useState<{
@@ -2093,6 +2168,12 @@ export default function App() {
       return;
     }
 
+    if (!isTimeAllowed(selectedBuilding, bookingDate, activeStartTime)) {
+      setBookingStatus('error');
+      setBookingMessage(t.outsideOperatingHours);
+      return;
+    }
+
     setBookingStatus('checking');
     setBookingMessage(t.checkingAvailability);
 
@@ -2117,6 +2198,12 @@ export default function App() {
     const startM = parseInt(activeStartTime.split(':')[1] || '0');
     const startTotal = startH * 60 + startM;
     const requestedEndTotal = startTotal + durationMins;
+
+    if (durationMins > MAX_BOOKING_DURATION_MINS) {
+      setBookingStatus('error');
+      setBookingMessage(t.maxDurationError.replace('{h}', (MAX_BOOKING_DURATION_MINS / 60).toString()));
+      return;
+    }
 
     // 1. Check for USER'S OWN schedule conflicts (across all rooms)
     if (!forcedDuration && !forcedStartTime) {
@@ -3039,12 +3126,14 @@ export default function App() {
                                 onChange={(e) => setBookingStartTime(e.target.value)}
                                 className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
                               >
-                                {Array.from({ length: 40 }, (_, i) => {
+                                {Array.from({ length: 64 }, (_, i) => {
                                   const h = Math.floor(i / 4) + 8;
                                   const m = (i % 4) * 15;
+                                  if (h >= 24) return null;
                                   const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                  if (!isTimeAllowed(selectedBuilding, bookingDate, time)) return null;
                                   return <option key={time} value={time}>{time}</option>;
-                                })}
+                                }).filter(Boolean)}
                               </select>
                             </div>
                             <div className="space-y-1.5">
@@ -3054,22 +3143,9 @@ export default function App() {
                                 onChange={(e) => setBookingDuration(e.target.value)}
                                 className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
                               >
-                                <option value="15 Minutos">15 Minutos</option>
-                                <option value="30 Minutos">30 Minutos</option>
-                                <option value="45 Minutos">45 Minutos</option>
-                                <option value="1 Hora">1 Hora</option>
-                                <option value="1 Hora e 15">1 Hora e 15</option>
-                                <option value="1 Hora e 30">1 Hora e 30</option>
-                                <option value="1 Hora e 45">1 Hora e 45</option>
-                                <option value="2 Horas">2 Horas</option>
-                                <option value="2 Horas e 15">2 Horas e 15</option>
-                                <option value="2 Horas e 30">2 Horas e 30</option>
-                                <option value="2 Horas e 45">2 Horas e 45</option>
-                                <option value="3 Horas">3 Horas</option>
-                                <option value="4 Horas">4 Horas</option>
-                                {!["15 Minutos", "30 Minutos", "45 Minutos", "1 Hora", "1 Hora e 15", "1 Hora e 30", "1 Hora e 45", "2 Horas", "2 Horas e 15", "2 Horas e 30", "2 Horas e 45", "3 Horas", "4 Horas"].includes(bookingDuration) && (
-                                  <option value={bookingDuration}>{bookingDuration}</option>
-                                )}
+                                {DURATION_OPTIONS.filter(opt => opt.mins <= MAX_BOOKING_DURATION_MINS).map(opt => (
+                                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
                               </select>
                             </div>
                           </div>
@@ -3080,6 +3156,7 @@ export default function App() {
                               bookingStatus === 'checking' || 
                               selectedRoom.operationalStatus !== 'Active' ||
                               getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                              !isTimeAllowed(selectedBuilding, bookingDate, bookingStartTime) ||
                               (() => {
                                 const now = getAppNow();
                                 const [h, m] = bookingStartTime.split(':').map(Number);
@@ -3091,6 +3168,7 @@ export default function App() {
                             className={`w-full rounded-xl py-3 text-sm font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${
                               selectedRoom.operationalStatus !== 'Active' ||
                               getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                              !isTimeAllowed(selectedBuilding, bookingDate, bookingStartTime) ||
                               (() => {
                                 const now = getAppNow();
                                 const [h, m] = bookingStartTime.split(':').map(Number);
@@ -3210,12 +3288,14 @@ export default function App() {
                               onChange={(e) => setBookingStartTime(e.target.value)}
                               className="absolute inset-0 opacity-0 cursor-pointer z-10"
                             >
-                              {Array.from({ length: 40 }, (_, i) => {
+                              {Array.from({ length: 64 }, (_, i) => {
                                 const h = Math.floor(i / 4) + 8;
                                 const m = (i % 4) * 15;
+                                if (h >= 24) return null;
                                 const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                if (!isTimeAllowed(selectedBuilding, bookingDate, time)) return null;
                                 return <option key={time} value={time}>{time}</option>;
-                              })}
+                              }).filter(Boolean)}
                             </select>
                             <div className="flex items-center gap-2 text-slate-900 font-bold">
                               <Clock size={18} className="text-primary" />
@@ -3231,19 +3311,9 @@ export default function App() {
                             onChange={(e) => setBookingDuration(e.target.value)}
                             className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 focus:border-primary focus:ring-primary appearance-none"
                           >
-                            <option value="15 Minutos">15 Minutos</option>
-                            <option value="30 Minutos">30 Minutos</option>
-                            <option value="45 Minutos">45 Minutos</option>
-                            <option value="1 Hora">1 Hora</option>
-                            <option value="1 Hora e 15">1 Hora e 15</option>
-                            <option value="1 Hora e 30">1 Hora e 30</option>
-                            <option value="1 Hora e 45">1 Hora e 45</option>
-                            <option value="2 Horas">2 Horas</option>
-                            <option value="2 Horas e 15">2 Horas e 15</option>
-                            <option value="2 Horas e 30">2 Horas e 30</option>
-                            <option value="2 Horas e 45">2 Horas e 45</option>
-                            <option value="3 Horas">3 Horas</option>
-                            <option value="4 Horas">4 Horas</option>
+                            {DURATION_OPTIONS.filter(opt => opt.mins <= MAX_BOOKING_DURATION_MINS).map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
                           </select>
                         </div>
                       </div>
@@ -3254,6 +3324,7 @@ export default function App() {
                           bookingStatus === 'checking' || 
                           selectedRoom.operationalStatus !== 'Active' ||
                           getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                          !isTimeAllowed(selectedBuilding, bookingDate, bookingStartTime) ||
                           (() => {
                             const now = getAppNow();
                             const [h, m] = bookingStartTime.split(':').map(Number);
@@ -3265,6 +3336,7 @@ export default function App() {
                         className={`w-full py-4 rounded-2xl font-bold text-lg shadow-xl transition-all flex items-center justify-center gap-2 ${
                           selectedRoom.operationalStatus !== 'Active' ||
                           getDynamicRoomStatus(selectedRoom.id, bookingDate, bookingStartTime) !== 'Available' ||
+                          !isTimeAllowed(selectedBuilding, bookingDate, bookingStartTime) ||
                           (() => {
                             const now = getAppNow();
                             const [h, m] = bookingStartTime.split(':').map(Number);

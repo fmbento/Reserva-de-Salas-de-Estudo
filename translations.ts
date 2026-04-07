@@ -129,6 +129,8 @@ export interface TranslationKeys {
   totalDuration: string;
   bookingError: string;
   selectDate: string;
+  outsideOperatingHours: string;
+  maxDurationError: string;
   
   // Status
   statusAvailable: string;
@@ -378,6 +380,8 @@ export const translations: Record<Language, TranslationKeys> = {
     totalDuration: "Duração Total",
     bookingError: "Erro ao efetuar reserva. Verifique a disponibilidade.",
     selectDate: "Selecione uma data",
+    outsideOperatingHours: "Fora do horário de funcionamento para este edifício e dia.",
+    maxDurationError: "A duração máxima permitida é de {h} horas.",
     
     // Status
     statusAvailable: "Disponível",
@@ -625,6 +629,8 @@ export const translations: Record<Language, TranslationKeys> = {
     totalDuration: "Total Duration",
     bookingError: "Error making booking. Check availability.",
     selectDate: "Select a date",
+    outsideOperatingHours: "Outside operating hours for this building and day.",
+    maxDurationError: "The maximum allowed duration is {h} hours.",
     
     // Status
     statusAvailable: "Available",
