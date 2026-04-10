@@ -89,10 +89,10 @@ This application is optimized for Vercel deployment using **Supabase** for data 
 
 For background tasks (reminders, auto-cancellation) to work on Vercel, the project is configured to use **Vercel Cron Jobs**.
 
-1. The configuration is already in `vercel.json`.
-2. When you deploy to Vercel, it will automatically detect the cron job.
-3. You can monitor the execution in the **"Cron"** tab of your Vercel project dashboard.
-4. The tasks run every minute to check for reminders and no-shows.
+1. The configuration is in `vercel.json`.
+2. **Note for Hobby Accounts:** Vercel Hobby accounts only support **one cron execution per day**. I've set it to `0 5 * * *` (5 AM) to allow deployment.
+3. **For Real-time Reminders:** If you need reminders every minute on a Hobby account, you should use an external service like [cron-job.org](https://cron-job.org/) to ping the endpoint `https://your-app.vercel.app/api/cron/automated-tasks` every minute.
+4. You can monitor the execution in the **"Cron"** tab of your Vercel project dashboard.
 
 ### ⚠️ Vercel Troubleshooting (500 Internal Server Error)
 

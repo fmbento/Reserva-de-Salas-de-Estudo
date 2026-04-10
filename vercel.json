@@ -29,7 +29,7 @@
   "crons": [
     {
       "path": "/api/cron/automated-tasks",
-      "schedule": "* * * * *"
+      "schedule": "0 5 * * *"
     }
   ]
 }
