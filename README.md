@@ -10,7 +10,7 @@ The system features:
 - 📧 Email notifications for reservations
 - 🗓️ Calendar integration (ICS format)
 - ⏱️ Mandatory 15-minute preparation buffer between bookings
-- 📲 Real-time check-in system with auto-cancellation for no-shows
+- 📲 Librarian-managed check-in system via Backoffice (available 10 min before/after start)
 - 🔔 Automated email reminders and end-of-reservation alerts
 - 👥 Role-based access control (User, Librarian, Admin)
 - 🌐 Supabase integration for data persistence and real-time features
@@ -83,6 +83,16 @@ This application is optimized for Vercel deployment using **Supabase** for data 
 - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service role key (for server-side).
 - `ADMIN_EMAIL`: Your admin email.
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`: Email configuration.
+- `CRON_SECRET`: (Optional) A secret key to secure the cron endpoint.
+
+### ⏰ Automated Tasks (Cron Jobs)
+
+For background tasks (reminders, auto-cancellation) to work on Vercel, the project is configured to use **Vercel Cron Jobs**.
+
+1. The configuration is already in `vercel.json`.
+2. When you deploy to Vercel, it will automatically detect the cron job.
+3. You can monitor the execution in the **"Cron"** tab of your Vercel project dashboard.
+4. The tasks run every minute to check for reminders and no-shows.
 
 ### ⚠️ Vercel Troubleshooting (500 Internal Server Error)
 
@@ -413,7 +423,7 @@ For support, please contact:
 
 ### Version 0.6.0 (April 10, 2026)
 - **Preparation Buffer**: Implemented a mandatory 15-minute "Verificação/Preparação" period after each booking. This buffer is visually distinct on the calendar and prevents overlapping reservations.
-- **Check-in System**: Added a mandatory check-in requirement. Users must check in via the "My Reservations" view within a 20-minute window (10 mins before to 10 mins after the start time).
+- **Check-in System**: Added a mandatory check-in requirement. Librarians must perform the check-in via the "Backoffice" view. The button appears 10 minutes before and disappears 10 minutes after the scheduled start time.
 - **Automated Notifications**:
     - **Start Reminder**: Automated email sent 15 minutes before the reservation starts.
     - **End Alert**: Automated email sent 10 minutes before the reservation ends with cleanup instructions.

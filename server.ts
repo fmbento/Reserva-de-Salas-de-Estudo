@@ -224,6 +224,18 @@ app.post("/api/emails/reservation-status", async (req, res) => {
   res.status(200).json({ success: true });
 });
 
+// --- Cron Endpoint for Vercel ---
+app.get("/api/cron/automated-tasks", async (req, res) => {
+  // Optional: Check for a secret to prevent unauthorized calls
+  // if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+  //   return res.status(401).end();
+  // }
+  
+  console.log("[CRON] Starting automated tasks...");
+  await checkAndSendAutomatedEmails();
+  res.status(200).json({ success: true, message: "Automated tasks completed" });
+});
+
 // --- OTP Authentication ---
 app.post("/api/auth/send-otp", async (req, res) => {
   const { email, lang } = req.body;
@@ -514,8 +526,11 @@ async function checkAndSendAutomatedEmails() {
   }
 }
 
-// Run every minute
-setInterval(checkAndSendAutomatedEmails, 60 * 1000);
+// Run every minute (only in non-production environments)
+if (process.env.NODE_ENV !== "production") {
+  console.log("[AUTOMATION] Starting local interval for automated tasks...");
+  setInterval(checkAndSendAutomatedEmails, 60 * 1000);
+}
 
 async function startServer() {
   const PORT = 3000;
