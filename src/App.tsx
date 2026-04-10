@@ -379,6 +379,23 @@ const Login = ({
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').trim().slice(0, 5).replace(/\D/g, '');
+    if (!pastedData) return;
+
+    const newValues = [...otpValues];
+    pastedData.split('').forEach((char, i) => {
+      if (i < 5) newValues[i] = char;
+    });
+    setOtpValues(newValues);
+    setOtp(newValues.join(''));
+
+    // Focus the next empty input or the last one
+    const nextIndex = Math.min(pastedData.length, 4);
+    otpInputs.current[nextIndex]?.focus();
+  };
+
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     const fullOtp = otpValues.join('');
@@ -524,6 +541,7 @@ const Login = ({
                     value={val}
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(i, e)}
+                    onPaste={handlePaste}
                     className="w-12 h-16 text-center text-2xl font-bold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all dark:text-white"
                     maxLength={1}
                     required
