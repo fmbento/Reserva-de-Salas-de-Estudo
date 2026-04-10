@@ -226,10 +226,12 @@ app.post("/api/emails/reservation-status", async (req, res) => {
 
 // --- Cron Endpoint for Vercel ---
 app.get("/api/cron/automated-tasks", async (req, res) => {
-  // Optional: Check for a secret to prevent unauthorized calls
-  // if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
-  //   return res.status(401).end();
-  // }
+  // Secure the endpoint: if CRON_SECRET is set, verify the Bearer token
+  const authHeader = req.headers.authorization;
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    console.warn("[CRON] Unauthorized attempt to trigger automated tasks");
+    return res.status(401).json({ error: "Unauthorized" });
+  }
   
   console.log("[CRON] Starting automated tasks...");
   await checkAndSendAutomatedEmails();
