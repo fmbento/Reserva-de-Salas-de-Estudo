@@ -1314,10 +1314,8 @@ const ManageRoomsView = ({
                     onChange={(e) => setEditDept(e.target.value)}
                     className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors"
                   >
-                    <option value="Departamento de Engenharia">Departamento de Engenharia</option>
-                    <option value="Departamento de Informática">{t.deptInformatics}</option>
-                    <option value="Departamento de Artes">Departamento de Artes</option>
-                    <option value="Biblioteca Geral">Biblioteca Geral</option>
+                    <option value="Biblioteca da UA">Biblioteca da UA</option>
+                    <option value="Mediateca">Mediateca</option>
                   </select>
                 </div>
 
@@ -1970,6 +1968,23 @@ export default function App() {
   const [selectedBuilding, setSelectedBuilding] = useState('17');
   const [selectedFloor, setSelectedFloor] = useState('2');
   const [selectedSection, setSelectedSection] = useState('Trás');
+
+  const availableFloors = useMemo(() => {
+    const floors = new Set<string>();
+    Object.keys(floorPlanMaps).forEach(key => {
+      const [b, f, s] = key.split('-');
+      if (b === selectedBuilding && s === selectedSection) {
+        floors.add(f);
+      }
+    });
+    return Array.from(floors).sort((a, b) => parseInt(a) - parseInt(b));
+  }, [floorPlanMaps, selectedBuilding, selectedSection]);
+
+  useEffect(() => {
+    if (availableFloors.length > 0 && !availableFloors.includes(selectedFloor)) {
+      setSelectedFloor(availableFloors[0]);
+    }
+  }, [availableFloors, selectedFloor]);
 
   const initialSlot = useMemo(() => getAppNextSlot(), []);
 
@@ -2827,9 +2842,9 @@ export default function App() {
                         onChange={(e) => setSelectedFloor(e.target.value)}
                         className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
                       >
-                        <option value="1">{t.floor} 1</option>
-                        <option value="2">{t.floor} 2</option>
-                        <option value="3">{t.floor} 3</option>
+                        {availableFloors.map(f => (
+                          <option key={f} value={f}>{t.floor} {f}</option>
+                        ))}
                       </select>
                       <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
                       <select 
