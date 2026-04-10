@@ -9,6 +9,9 @@ The system features:
 - 📅 Real-time availability checking
 - 📧 Email notifications for reservations
 - 🗓️ Calendar integration (ICS format)
+- ⏱️ Mandatory 15-minute preparation buffer between bookings
+- 📲 Real-time check-in system with auto-cancellation for no-shows
+- 🔔 Automated email reminders and end-of-reservation alerts
 - 👥 Role-based access control (User, Librarian, Admin)
 - 🌐 Supabase integration for data persistence and real-time features
 - 🎨 Official UA branding and improved Dark Mode
@@ -284,7 +287,9 @@ The system sends automated emails for:
 - **Welcome Email** - When new user registers
 - **Reservation Pending** - When reservation request is submitted
 - **Reservation Confirmed** - When admin approves reservation (includes ICS calendar file)
-- **Reservation Cancelled** - When reservation is cancelled
+- **Reservation Reminder** - Sent 15 minutes before start (includes check-in warning)
+- **End of Reservation Alert** - Sent 10 minutes before end (includes cleanup reminder)
+- **Reservation Cancelled** - When reservation is cancelled (manually or via auto-cancellation)
 
 Emails are formatted in Portuguese and include:
 - Room details
@@ -406,6 +411,16 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.6.0 (April 10, 2026)
+- **Preparation Buffer**: Implemented a mandatory 15-minute "Verificação/Preparação" period after each booking. This buffer is visually distinct on the calendar and prevents overlapping reservations.
+- **Check-in System**: Added a mandatory check-in requirement. Users must check in via the "My Reservations" view within a 20-minute window (10 mins before to 10 mins after the start time).
+- **Automated Notifications**:
+    - **Start Reminder**: Automated email sent 15 minutes before the reservation starts.
+    - **End Alert**: Automated email sent 10 minutes before the reservation ends with cleanup instructions.
+- **Auto-Cancellation**: Implemented a background task that automatically cancels reservations if the user fails to check in within 10 minutes of the scheduled start time.
+- **OTP Improvements**: Fixed an issue where users could not paste the full OTP code into the input field.
+- **UI Refinements**: Renamed "Departamento" to "Edifício" and updated building options to "Biblioteca da UA" and "Mediateca".
+
 ### Version 0.5.0 (April 4, 2026)
 - **Database Migration**: Switched from SQLite and Vercel Blob to **Supabase** for improved scalability, persistence, and real-time capabilities.
 - **Supabase Integration**: Added `@supabase/supabase-js` and configured both client and server to use Supabase.
@@ -477,7 +492,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** April 4, 2026
+**Last Updated:** April 10, 2026
 ```
 
 This README provides:
