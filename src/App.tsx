@@ -160,6 +160,7 @@ const OPERATING_HOURS = (() => {
 })();
 
 const MAX_BOOKING_DURATION_MINS = parseInt(import.meta.env.VITE_MAX_BOOKING_DURATION_MINS || '240');
+const BUFFER_DURATION_MINS = 15;
 
 const isTimeAllowed = (buildingId: string, dateStr: string, timeStr: string) => {
   const hoursConfig = OPERATING_HOURS[buildingId];
@@ -1626,44 +1627,58 @@ const SchedulesView = ({
     return `${format(min)} > ${format(max)}`;
   };
 
-  // Map real reservations to schedule data
-  const scheduleData = reservations
-    .filter(res => res.roomId === selectedRoomId)
-    .map(res => {
-      const resDate = new Date(res.date);
-      const weekStart = new Date(currentDate);
-      weekStart.setDate(weekStart.getDate() - (weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1));
-      weekStart.setHours(0, 0, 0, 0);
-      
-      const diffTime = resDate.getTime() - weekStart.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      
-      const startH = parseInt(res.startTime.split(':')[0]);
-      const startM = parseInt(res.startTime.split(':')[1] || '0');
-      const startTotal = startH * 60 + startM;
-      
-      // Parse duration string (e.g., "1 Hora", "45 Minutos")
-      let durationMins = 60;
-      if (res.duration.includes('Hora')) {
-        const h = parseInt(res.duration.split(' ')[0]);
-        durationMins = h * 60;
-        if (res.duration.includes('e')) {
-          durationMins += parseInt(res.duration.split('e ')[1]);
+  // Map real reservations to schedule data (including buffers)
+  const scheduleData = useMemo(() => {
+    const data: any[] = [];
+    reservations
+      .filter(res => res.roomId === selectedRoomId && res.status !== 'Cancelled')
+      .forEach(res => {
+        const resDate = new Date(res.date);
+        const weekStart = new Date(currentDate);
+        weekStart.setDate(weekStart.getDate() - (weekStart.getDay() === 0 ? 6 : weekStart.getDay() - 1));
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const diffTime = resDate.getTime() - weekStart.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        const startH = parseInt(res.startTime.split(':')[0]);
+        const startM = parseInt(res.startTime.split(':')[1] || '0');
+        const startTotal = startH * 60 + startM;
+        
+        let durationMins = 60;
+        if (res.duration.includes('Hora')) {
+          const h = parseInt(res.duration.split(' ')[0]);
+          durationMins = h * 60;
+          if (res.duration.includes('e')) {
+            durationMins += parseInt(res.duration.split('e ')[1]);
+          }
+        } else {
+          durationMins = parseInt(res.duration.split(' ')[0]);
         }
-      } else {
-        durationMins = parseInt(res.duration.split(' ')[0]);
-      }
 
-      return {
-        day: diffDays,
-        start: res.startTime,
-        startTotal,
-        duration: durationMins,
-        status: res.status === 'Pending' ? 'Pending' : 'Occupied',
-        title: res.subject || t.reservation
-      };
-    })
-    .filter(item => item.day >= 0 && item.day < 7);
+        // Add the reservation itself
+        data.push({
+          day: diffDays,
+          start: res.startTime,
+          startTotal,
+          duration: durationMins,
+          status: res.status === 'Pending' ? 'Pending' : 'Occupied',
+          title: res.subject || t.reservation,
+          type: 'reservation'
+        });
+
+        // Add the 15-minute buffer
+        data.push({
+          day: diffDays,
+          startTotal: startTotal + durationMins,
+          duration: BUFFER_DURATION_MINS,
+          status: 'Buffer',
+          title: lang === 'pt' ? 'Verificação/Preparação' : 'Verification/Preparation',
+          type: 'buffer'
+        });
+      });
+    return data.filter(item => item.day >= 0 && item.day < 7);
+  }, [reservations, selectedRoomId, currentDate, t, lang]);
 
   const getWeekRange = () => {
     const start = new Date(currentDate);
@@ -1795,6 +1810,10 @@ const SchedulesView = ({
                 <div className="h-3 w-3 rounded-full bg-rose-500" />
                 <span className="text-xs font-medium text-slate-600">{t.statusOccupied}</span>
               </div>
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-slate-400" />
+                <span className="text-xs font-medium text-slate-600">{lang === 'pt' ? 'Preparação' : 'Preparation'}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1877,14 +1896,22 @@ const SchedulesView = ({
                         className={`absolute left-1 right-1 rounded-xl p-3 border-l-4 shadow-sm z-10 ${
                           item.status === 'Occupied' 
                             ? 'bg-rose-50 border-rose-500 text-rose-900' 
-                            : 'bg-amber-50 border-amber-500 text-amber-900'
+                            : item.status === 'Pending'
+                            ? 'bg-amber-50 border-amber-500 text-amber-900'
+                            : 'bg-slate-100 border-slate-400 text-slate-600'
                         }`}
                         style={{ top: `${top + 4}px`, height: `${height - 8}px` }}
                       >
-                        <div className="flex flex-col h-full">
-                          <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{item.status === 'Occupied' ? 'OCUPADO' : 'PENDENTE'}</span>
+                        <div className="flex flex-col h-full overflow-hidden">
+                          <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">
+                            {item.status === 'Occupied' ? 'OCUPADO' : item.status === 'Pending' ? 'PENDENTE' : 'BUFFER'}
+                          </span>
                           <span className="text-xs font-bold truncate mt-1">{item.title}</span>
-                          <span className="text-[10px] mt-auto opacity-70">{item.start} - {Math.floor((item.startTotal + item.duration) / 60)}:{(item.startTotal + item.duration) % 60 === 0 ? '00' : (item.startTotal + item.duration) % 60}</span>
+                          {item.status !== 'Buffer' && (
+                            <span className="text-[10px] mt-auto opacity-70">
+                              {item.start} - {Math.floor((item.startTotal + item.duration) / 60)}:{(item.startTotal + item.duration) % 60 === 0 ? '00' : ((item.startTotal + item.duration) % 60).toString().padStart(2, '0')}
+                            </span>
+                          )}
                         </div>
                       </motion.div>
                     );
@@ -2172,7 +2199,8 @@ export default function App() {
       }
       
       const resEndTotal = resStartTotal + resDurationMins;
-      return startTotal >= resStartTotal && startTotal < resEndTotal;
+      // Include 15 min buffer in the occupied check
+      return startTotal >= resStartTotal && startTotal < (resEndTotal + BUFFER_DURATION_MINS);
     });
 
     if (overlapping) {
@@ -2261,16 +2289,16 @@ export default function App() {
           return { ...res, startTotal: resStartTotal, endTotal: resStartTotal + resDurationMins };
         });
 
-      // Check for overlap
+      // Check for overlap (including buffer)
       const overlappingRes = userReservations.find(res => 
-        (startTotal < res.endTotal && requestedEndTotal > res.startTotal)
+        (startTotal < (res.endTotal + BUFFER_DURATION_MINS) && (requestedEndTotal + BUFFER_DURATION_MINS) > res.startTotal)
       );
 
       if (overlappingRes) {
         // Try to suggest adjustments
-        // Case A: User has a reservation that ends after our requested start
-        if (overlappingRes.endTotal > startTotal && overlappingRes.startTotal <= startTotal) {
-          const newStartTotal = overlappingRes.endTotal;
+        // Case A: User has a reservation that ends after our requested start (including buffer)
+        if ((overlappingRes.endTotal + BUFFER_DURATION_MINS) > startTotal && overlappingRes.startTotal <= startTotal) {
+          const newStartTotal = overlappingRes.endTotal + BUFFER_DURATION_MINS;
           const newDuration = requestedEndTotal - newStartTotal;
           
           if (newDuration > 0) {
@@ -2291,9 +2319,9 @@ export default function App() {
           }
         }
         
-        // Case B: User has a reservation that starts before our requested end
-        if (overlappingRes.startTotal < requestedEndTotal && overlappingRes.endTotal >= requestedEndTotal) {
-          const newDuration = overlappingRes.startTotal - startTotal;
+        // Case B: User has a reservation that starts before our requested end (including buffer)
+        if (overlappingRes.startTotal < (requestedEndTotal + BUFFER_DURATION_MINS) && (overlappingRes.endTotal + BUFFER_DURATION_MINS) >= (requestedEndTotal + BUFFER_DURATION_MINS)) {
+          const newDuration = overlappingRes.startTotal - BUFFER_DURATION_MINS - startTotal;
           
           if (newDuration > 0) {
             const availableUntilH = Math.floor(overlappingRes.startTotal / 60);
@@ -2331,10 +2359,10 @@ export default function App() {
         .filter(res => res.startTotal > startTotal)
         .sort((a, b) => a.startTotal - b.startTotal)[0];
 
-      if (nextReservation && nextReservation.startTotal < requestedEndTotal) {
-        const availableMins = nextReservation.startTotal - startTotal;
-        const availableUntilH = Math.floor(nextReservation.startTotal / 60);
-        const availableUntilM = nextReservation.startTotal % 60;
+      if (nextReservation && nextReservation.startTotal < (requestedEndTotal + BUFFER_DURATION_MINS)) {
+        const availableMins = nextReservation.startTotal - BUFFER_DURATION_MINS - startTotal;
+        const availableUntilH = Math.floor((nextReservation.startTotal - BUFFER_DURATION_MINS) / 60);
+        const availableUntilM = (nextReservation.startTotal - BUFFER_DURATION_MINS) % 60;
         const availableUntilStr = `${availableUntilH.toString().padStart(2, '0')}:${availableUntilM.toString().padStart(2, '0')}`;
         
         setConflictModal({

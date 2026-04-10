@@ -1,4 +1,4 @@
 17-2-Trás: https://api-assets.ua.pt/files/imgs/000/035/175/original.png
 17-3-Frente: https://api-assets.ua.pt/files/imgs/000/035/322/original.jpg
 17-3-Trás: https://api-assets.ua.pt/files/imgs/000/035/303/original.jpg
-17-4-Trás: https://api-assets.ua.pt/files/imgs/000/035/376/original.jpg
+17-4-Trás: https://api-assets.ua.pt/files/imgs/000/035/386/original.jpg
