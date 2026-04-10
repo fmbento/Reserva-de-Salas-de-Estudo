@@ -359,6 +359,164 @@ if (process.env.NODE_ENV !== "production") {
 // Export for Vercel
 export default app;
 
+async function sendReminderEmail(email: string, roomName: string, res: any, lang: Language = 'pt') {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const t = translations[lang];
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: t.emailReminderSubject,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
+          <p>${t.emailReminderTitle}</p>
+          <p>${t.emailReminderBody.replace('{roomName}', roomName)}</p>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>${t.emailRoom}:</strong> ${roomName}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${res.date}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(res.startTime, res.duration, lang)}</p>
+          </div>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send reminder email to ${email}:`, error);
+  }
+}
+
+async function sendEndAlertEmail(email: string, roomName: string, res: any, lang: Language = 'pt') {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  const t = translations[lang];
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: t.emailEndAlertSubject,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #0066cc; text-align: center;">SiReS Bibliotecas UA</h2>
+          <p>${t.emailEndAlertTitle}</p>
+          <p>${t.emailEndAlertBody.replace('{roomName}', roomName)}</p>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 5px 0;"><strong>${t.emailRoom}:</strong> ${roomName}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${res.date}</p>
+            <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(res.startTime, res.duration, lang)}</p>
+          </div>
+          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send end alert email to ${email}:`, error);
+  }
+}
+
+// Track sent emails to avoid duplicates in memory (simple approach)
+const sentReminders = new Set<string>();
+const sentEndAlerts = new Set<string>();
+
+async function checkAndSendAutomatedEmails() {
+  if (!supabaseUrl || !supabaseKey) return;
+
+  try {
+    const now = new Date();
+    // Use a fixed timezone if needed, but here we'll assume UTC or server time matches DB
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Fetch active reservations for today
+    const { data: reservations, error: resError } = await supabase
+      .from('reservations')
+      .select('*')
+      .eq('date', todayStr)
+      .in('status', ['Confirmed', 'Occupied']);
+
+    if (resError) throw resError;
+    if (!reservations || reservations.length === 0) return;
+
+    // Fetch rooms and users for lookup
+    const { data: rooms, error: roomsError } = await supabase.from('rooms').select('id, name');
+    const { data: users, error: usersError } = await supabase.from('users').select('id, email, lang');
+
+    if (roomsError) throw roomsError;
+    if (usersError) throw usersError;
+
+    const roomsMap = new Map(rooms?.map(r => [r.id.toString(), r.name]));
+    const usersMap = new Map(users?.map(u => [u.id.toString(), u]));
+
+    for (const res of reservations) {
+      const startTimeStr = res.start_time || res.startTime;
+      if (!startTimeStr) continue;
+
+      const [startH, startM] = startTimeStr.split(':').map(Number);
+      const startTime = new Date(now);
+      startTime.setHours(startH, startM, 0, 0);
+
+      const duration = res.duration || 60;
+      const endTime = new Date(startTime);
+      endTime.setMinutes(endTime.getMinutes() + duration);
+
+      const diffToStart = (startTime.getTime() - now.getTime()) / (1000 * 60);
+      const diffToEnd = (endTime.getTime() - now.getTime()) / (1000 * 60);
+
+      const userId = (res.user_id || res.userId)?.toString();
+      const roomId = (res.room_id || res.roomId)?.toString();
+      const user = usersMap.get(userId);
+      const roomName = roomsMap.get(roomId) || 'Sala';
+      const userEmail = user?.email || res.userEmail;
+      const lang = (user?.lang || 'pt') as Language;
+
+      if (!userEmail) continue;
+
+      // Auto-cancellation: 10 minutes after start if not checked in (status is still 'Confirmed')
+      if (res.status === 'Confirmed' && diffToStart < -10) {
+        console.log(`[AUTOMATION] Auto-cancelling reservation ${res.id} due to no-show`);
+        const { error: cancelError } = await supabase
+          .from('reservations')
+          .update({ status: 'Cancelled' })
+          .eq('id', res.id);
+        
+        if (cancelError) {
+          console.error(`[AUTOMATION] Failed to auto-cancel reservation ${res.id}:`, cancelError);
+        } else {
+          // Send cancellation email
+          await sendReservationStatusEmail(userEmail, roomName, { ...res, startTime: startTimeStr, duration }, 'Cancelled', lang);
+        }
+        continue; // Skip other alerts for this reservation
+      }
+
+      // Reminder: 15 minutes before start (window: 14-16 mins)
+      if (diffToStart > 14 && diffToStart <= 16 && !sentReminders.has(res.id.toString())) {
+        console.log(`[AUTOMATION] Sending reminder for reservation ${res.id}`);
+        await sendReminderEmail(userEmail, roomName, { ...res, startTime: startTimeStr, duration }, lang);
+        sentReminders.add(res.id.toString());
+      }
+
+      // End Alert: 10 minutes before end (window: 9-11 mins)
+      if (diffToEnd > 9 && diffToEnd <= 11 && !sentEndAlerts.has(res.id.toString())) {
+        console.log(`[AUTOMATION] Sending end alert for reservation ${res.id}`);
+        await sendEndAlertEmail(userEmail, roomName, { ...res, startTime: startTimeStr, duration }, lang);
+        sentEndAlerts.add(res.id.toString());
+      }
+    }
+
+    // Periodically clear old IDs from sets (e.g., every day)
+    if (now.getHours() === 0 && now.getMinutes() === 0) {
+      sentReminders.clear();
+      sentEndAlerts.clear();
+    }
+
+  } catch (err) {
+    console.error("[AUTOMATION] Error in automated emails task:", err);
+  }
+}
+
+// Run every minute
+setInterval(checkAndSendAutomatedEmails, 60 * 1000);
+
 async function startServer() {
   const PORT = 3000;
   server.listen(PORT, "0.0.0.0", () => {

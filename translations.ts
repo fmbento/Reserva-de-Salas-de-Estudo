@@ -135,6 +135,12 @@ export interface TranslationKeys {
   // Status
   statusAvailable: string;
   statusPending: string;
+  checkIn: string;
+  checkInSuccess: string;
+  checkInError: string;
+  alreadyCheckedIn: string;
+  checkInTooEarly: string;
+  checkInTooLate: string;
   statusConfirmed: string;
   statusOccupied: string;
   statusCancelled: string;
@@ -237,6 +243,12 @@ export interface TranslationKeys {
   emailReservationCancelledBody: string;
   emailReservationApproved: string;
   emailReservationRejected: string;
+  emailReminderSubject: string;
+  emailReminderTitle: string;
+  emailReminderBody: string;
+  emailEndAlertSubject: string;
+  emailEndAlertTitle: string;
+  emailEndAlertBody: string;
   emailDetailsTitle: string;
   emailRoomLabel: string;
   emailDateLabel: string;
@@ -387,6 +399,12 @@ export const translations: Record<Language, TranslationKeys> = {
     statusAvailable: "Disponível",
     statusPending: "Pendente",
     statusConfirmed: "Confirmada",
+    checkIn: "Check-in",
+    checkInSuccess: "Check-in realizado com sucesso!",
+    checkInError: "Erro ao realizar check-in.",
+    alreadyCheckedIn: "Já realizou o check-in para esta reserva.",
+    checkInTooEarly: "Ainda é cedo para fazer o check-in (disponível 10 min antes).",
+    checkInTooLate: "Já passou o tempo limite para o check-in.",
     statusOccupied: "Ocupada",
     statusCancelled: "Cancelada",
     statusCompleted: "Concluída",
@@ -488,6 +506,12 @@ export const translations: Record<Language, TranslationKeys> = {
     emailReservationCancelledBody: "A sua reserva para a sala {roomName} no dia {date} às {time} foi cancelada.",
     emailReservationApproved: "A sua reserva foi aprovada.",
     emailReservationRejected: "A sua reserva foi rejeitada/cancelada.",
+    emailReminderSubject: "Lembrete de Reserva - SiReS UA",
+    emailReminderTitle: "A sua reserva começa em breve",
+    emailReminderBody: "Lembramos que a sua reserva para a sala {roomName} inicia em 15 minutos. Se não comparecer até 10 minutos após a hora de início, a reserva será cancelada automaticamente.",
+    emailEndAlertSubject: "A sua reserva está a terminar - SiReS UA",
+    emailEndAlertTitle: "Reserva a terminar",
+    emailEndAlertBody: "A sua reserva para a sala {roomName} termina em 10 minutos. Por favor, deixe a sala limpa e leve todos os seus pertences.",
     emailDetailsTitle: "Detalhes da Reserva:",
     emailRoomLabel: "Sala",
     emailDateLabel: "Data",
@@ -636,6 +660,12 @@ export const translations: Record<Language, TranslationKeys> = {
     statusAvailable: "Available",
     statusPending: "Pending",
     statusConfirmed: "Confirmed",
+    checkIn: "Check-in",
+    checkInSuccess: "Check-in successful!",
+    checkInError: "Error during check-in.",
+    alreadyCheckedIn: "You have already checked in for this reservation.",
+    checkInTooEarly: "It's too early to check in (available 10 min before).",
+    checkInTooLate: "The check-in time limit has passed.",
     statusOccupied: "Occupied",
     statusCancelled: "Cancelled",
     statusCompleted: "Completed",
@@ -737,6 +767,12 @@ export const translations: Record<Language, TranslationKeys> = {
     emailReservationCancelledBody: "Your reservation for room {roomName} on {date} at {time} has been cancelled.",
     emailReservationApproved: "Your reservation has been approved.",
     emailReservationRejected: "Your reservation has been rejected/cancelled.",
+    emailReminderSubject: "Reservation Reminder - SiReS UA",
+    emailReminderTitle: "Your reservation starts soon",
+    emailReminderBody: "We remind you that your reservation for room {roomName} starts in 15 minutes. If you do not show up within 10 minutes after the start time, the reservation will be automatically cancelled.",
+    emailEndAlertSubject: "Your reservation is ending - SiReS UA",
+    emailEndAlertTitle: "Reservation ending",
+    emailEndAlertBody: "Your reservation for room {roomName} ends in 10 minutes. Please leave the room clean and take all your belongings.",
     emailDetailsTitle: "Reservation Details:",
     emailRoomLabel: "Room",
     emailDateLabel: "Date",

@@ -2416,6 +2416,47 @@ export default function App() {
     }
   };
 
+  const handleCheckIn = async (id: string) => {
+    try {
+      const res = reservations.find(r => r.id === id);
+      if (!res) return;
+
+      const now = getAppNow();
+      const resStart = new Date(`${res.date}T${res.startTime}`);
+      
+      // Allow check-in 10 mins before and 10 mins after start
+      const windowStart = new Date(resStart.getTime() - 10 * 60 * 1000);
+      const windowEnd = new Date(resStart.getTime() + 10 * 60 * 1000);
+
+      if (now < windowStart) {
+        setBookingStatus('error');
+        setBookingMessage(t.checkInTooEarly);
+        return;
+      }
+
+      if (now > windowEnd) {
+        setBookingStatus('error');
+        setBookingMessage(t.checkInTooLate);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('reservations')
+        .update({ status: 'Occupied' })
+        .eq('id', Number(id));
+
+      if (error) throw error;
+
+      setBookingStatus('success');
+      setBookingMessage(t.checkInSuccess);
+      setTimeout(() => setBookingStatus('idle'), 3000);
+    } catch (error: any) {
+      setBookingStatus('error');
+      setBookingMessage(t.checkInError);
+      handleSupabaseError(error, OperationType.UPDATE, 'reservations');
+    }
+  };
+
   const handleDeleteReservation = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setReservationToDelete(id);
@@ -3026,7 +3067,13 @@ export default function App() {
                                 </div>
                                 <div className="space-y-4">
                                   {active.map((res) => (
-                                    <ReservationCard key={res.id} res={res} onDelete={handleDeleteReservation} lang={lang} />
+                                    <ReservationCard 
+                                      key={res.id} 
+                                      res={res} 
+                                      onDelete={handleDeleteReservation} 
+                                      onCheckIn={handleCheckIn}
+                                      lang={lang} 
+                                    />
                                   ))}
                                 </div>
                               </div>
@@ -3041,7 +3088,13 @@ export default function App() {
                                 </div>
                                 <div className="space-y-4 opacity-80">
                                   {completed.map((res) => (
-                                    <ReservationCard key={res.id} res={res} onDelete={handleDeleteReservation} lang={lang} />
+                                    <ReservationCard 
+                                      key={res.id} 
+                                      res={res} 
+                                      onDelete={handleDeleteReservation} 
+                                      onCheckIn={handleCheckIn}
+                                      lang={lang} 
+                                    />
                                   ))}
                                 </div>
                               </div>
@@ -3676,9 +3729,11 @@ function Amenity({ icon, label }: { icon: React.ReactNode, label: string, key?: 
   );
 }
 
-function ReservationCard({ res, onDelete, lang }: { res: Reservation, onDelete: (id: string, e: React.MouseEvent) => void, lang: string, key?: string | number }) {
+function ReservationCard({ res, onDelete, onCheckIn, lang }: { res: Reservation, onDelete: (id: string, e: React.MouseEvent) => void, onCheckIn: (id: string) => void, lang: string, key?: string | number }) {
   const t = translations[lang as keyof typeof translations];
   
+  const canCheckIn = res.status === 'Confirmed';
+
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-all">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -3700,6 +3755,14 @@ function ReservationCard({ res, onDelete, lang }: { res: Reservation, onDelete: 
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {canCheckIn && (
+            <button
+              onClick={() => onCheckIn(res.id)}
+              className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              {t.checkIn}
+            </button>
+          )}
           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
             res.status === 'Pending' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
             res.status === 'Confirmed' || res.status === 'Occupied' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' :
@@ -3707,7 +3770,8 @@ function ReservationCard({ res, onDelete, lang }: { res: Reservation, onDelete: 
             'bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400'
           }`}>
             {res.status === 'Pending' ? t.statusPending : 
-             (res.status === 'Confirmed' || res.status === 'Occupied') ? t.statusConfirmed : 
+             res.status === 'Confirmed' ? t.statusConfirmed : 
+             res.status === 'Occupied' ? t.statusOccupied :
              res.status === 'Completed' ? t.statusCompleted : t.statusCancelled}
           </span>
           
