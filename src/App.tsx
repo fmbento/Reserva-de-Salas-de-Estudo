@@ -2876,7 +2876,7 @@ export default function App() {
                 {/* Map Filters */}
                 <div className="absolute top-20 md:top-4 left-4 right-4 z-40 flex flex-col gap-3">
                   <div className="flex flex-wrap gap-2">
-                    <div className="flex gap-2 p-1.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-xl shadow-lg border border-white dark:border-slate-800">
+                    <div className="flex flex-wrap gap-2 p-1.5 bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-xl shadow-lg border border-white dark:border-slate-800">
                       <select 
                         value={selectedBuilding}
                         onChange={(e) => setSelectedBuilding(e.target.value)}
@@ -2904,60 +2904,86 @@ export default function App() {
                           <option key={f} value={f}>{t.floor} {f}</option>
                         ))}
                       </select>
-                    </div>
-
-                    <div className="flex gap-2 rounded-xl border border-white dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 p-1.5 shadow-lg backdrop-blur">
-                      <LegendItem color="bg-emerald-500" label={t.statusAvailable.toUpperCase()} />
-                      <LegendItem color="bg-amber-500" label={t.statusPending.toUpperCase()} />
-                      <LegendItem color="bg-rose-500" label={t.statusOccupied.toUpperCase()} />
+                      <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
+                      <input 
+                        type="date" 
+                        value={bookingDate}
+                        onChange={(e) => setBookingDate(e.target.value)}
+                        className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer p-0"
+                        min={getAppDate()}
+                      />
+                      <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
+                      <select 
+                        value={bookingStartTime}
+                        onChange={(e) => setBookingStartTime(e.target.value)}
+                        className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer p-0"
+                      >
+                        {Array.from({ length: 64 }, (_, i) => {
+                          const h = Math.floor(i / 4) + 8;
+                          const m = (i % 4) * 15;
+                          if (h >= 24) return null;
+                          const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                          if (!isTimeAllowed(selectedBuilding, bookingDate, time)) return null;
+                          return <option key={time} value={time}>{time}</option>;
+                        }).filter(Boolean)}
+                      </select>
                     </div>
                   </div>
                 </div>
 
                 {/* Map Container */}
-                <div className="absolute inset-0 flex items-center justify-center p-1 md:p-4 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors overflow-hidden">
-                  <div 
-                    className="relative flex items-center justify-center max-w-full max-h-full"
-                    style={{ 
-                      transform: `scale(${mapScale})`,
-                      transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    }}
-                  >
-                    <div className="relative inline-block max-w-full max-h-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden">
-                      {/* Mock Floor Plan Background */}
-                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
-                      
-                      {/* Floor Plan Image */}
-                      <img 
-                        src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
-                        alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
-                        className="max-w-full max-h-full object-contain opacity-80 dark:opacity-60 transition-opacity duration-500 block"
-                        style={{ maxHeight: 'calc(100vh - 200px)' }}
-                        referrerPolicy="no-referrer"
-                      />
-                      
-                      {/* Room Markers */}
-                      <div className="absolute inset-0">
-                        {filteredRoomsForMap.map((room) => {
-                        const dynamicStatus = getDynamicRoomStatus(room.id, bookingDate, bookingStartTime);
-                        const statusColor = dynamicStatus === 'Available' ? 'bg-emerald-500' : 
-                                           dynamicStatus === 'Pending' ? 'bg-amber-500' : 'bg-rose-500';
-                        return (
-                          <RoomMarker 
-                            key={room.id} 
-                            room={room} 
-                            isSelected={selectedRoomId === room.id}
-                            onClick={() => {
-                              setSelectedRoomId(room.id);
-                              setMobileShowDetails(true);
-                            }}
-                            statusColor={statusColor}
-                            status={dynamicStatus}
-                          />
-                        );
-                      })}
+                <div className="relative flex-1 flex flex-col overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-center p-1 md:p-4 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors overflow-hidden">
+                    <div 
+                      className="relative flex items-center justify-center max-w-full max-h-full"
+                      style={{ 
+                        transform: `scale(${mapScale})`,
+                        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}
+                    >
+                      <div className="relative inline-block max-w-full max-h-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden">
+                        {/* Mock Floor Plan Background */}
+                        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
+                        
+                        {/* Floor Plan Image */}
+                        <img 
+                          src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
+                          alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
+                          className="max-w-full max-h-full object-contain opacity-80 dark:opacity-60 transition-opacity duration-500 block"
+                          style={{ maxHeight: 'calc(100vh - 200px)' }}
+                          referrerPolicy="no-referrer"
+                        />
+                        
+                        {/* Room Markers */}
+                        <div className="absolute inset-0">
+                          {filteredRoomsForMap.map((room) => {
+                          const dynamicStatus = getDynamicRoomStatus(room.id, bookingDate, bookingStartTime);
+                          const statusColor = dynamicStatus === 'Available' ? 'bg-emerald-500' : 
+                                             dynamicStatus === 'Pending' ? 'bg-amber-500' : 'bg-rose-500';
+                          return (
+                            <RoomMarker 
+                              key={room.id} 
+                              room={room} 
+                              isSelected={selectedRoomId === room.id}
+                              onClick={() => {
+                                setSelectedRoomId(room.id);
+                                setMobileShowDetails(true);
+                              }}
+                              statusColor={statusColor}
+                              status={dynamicStatus}
+                            />
+                          );
+                        })}
+                        </div>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Legend below map */}
+                  <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-4 py-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-10">
+                    <LegendItem color="bg-emerald-500" label={t.statusAvailable.toUpperCase()} />
+                    <LegendItem color="bg-amber-500" label={t.statusPending.toUpperCase()} />
+                    <LegendItem color="bg-rose-500" label={t.statusOccupied.toUpperCase()} />
                   </div>
                 </div>
 
@@ -3199,47 +3225,18 @@ export default function App() {
                             />
                           </div>
 
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.selectDate}</label>
-                            <input 
-                              type="date" 
-                              value={bookingDate}
-                              onChange={(e) => setBookingDate(e.target.value)}
-                              className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
-                              min={getAppDate()}
-                            />
-                          </div>
                           
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.startTime}</label>
-                              <select 
-                                value={bookingStartTime}
-                                onChange={(e) => setBookingStartTime(e.target.value)}
-                                className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
-                              >
-                                {Array.from({ length: 64 }, (_, i) => {
-                                  const h = Math.floor(i / 4) + 8;
-                                  const m = (i % 4) * 15;
-                                  if (h >= 24) return null;
-                                  const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                                  if (!isTimeAllowed(selectedBuilding, bookingDate, time)) return null;
-                                  return <option key={time} value={time}>{time}</option>;
-                                }).filter(Boolean)}
-                              </select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.duration}</label>
-                              <select 
-                                value={bookingDuration}
-                                onChange={(e) => setBookingDuration(e.target.value)}
-                                className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
-                              >
-                                {DURATION_OPTIONS.filter(opt => opt.mins <= MAX_BOOKING_DURATION_MINS).map(opt => (
-                                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                              </select>
-                            </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.duration}</label>
+                            <select 
+                              value={bookingDuration}
+                              onChange={(e) => setBookingDuration(e.target.value)}
+                              className="w-full rounded-lg border-slate-200 bg-slate-50 text-sm focus:border-primary focus:ring-primary"
+                            >
+                              {DURATION_OPTIONS.filter(opt => opt.mins <= MAX_BOOKING_DURATION_MINS).map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
                           </div>
 
                           <button 
@@ -3352,48 +3349,6 @@ export default function App() {
                             onChange={(e) => setBookingSubject(e.target.value)}
                             className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-primary focus:ring-primary"
                           />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative overflow-hidden">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Data</p>
-                            <div className="flex items-center gap-2 text-slate-900 font-bold pointer-events-none">
-                              <Calendar size={18} className="text-primary" />
-                              {(() => {
-                                const [y, m, d] = bookingDate.split('-').map(Number);
-                                const date = new Date(y, m - 1, d);
-                                return date.toLocaleDateString('pt-PT', { month: 'short', day: 'numeric' });
-                              })()}
-                            </div>
-                            <input 
-                              type="date" 
-                              value={bookingDate}
-                              onChange={(e) => setBookingDate(e.target.value)}
-                              className="absolute inset-0 opacity-0 cursor-pointer z-20 w-full h-full appearance-none"
-                              min={getAppDate()}
-                            />
-                          </div>
-                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Hora</p>
-                            <select 
-                              value={bookingStartTime}
-                              onChange={(e) => setBookingStartTime(e.target.value)}
-                              className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                            >
-                              {Array.from({ length: 64 }, (_, i) => {
-                                const h = Math.floor(i / 4) + 8;
-                                const m = (i % 4) * 15;
-                                if (h >= 24) return null;
-                                const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-                                if (!isTimeAllowed(selectedBuilding, bookingDate, time)) return null;
-                                return <option key={time} value={time}>{time}</option>;
-                              }).filter(Boolean)}
-                            </select>
-                            <div className="flex items-center gap-2 text-slate-900 font-bold">
-                              <Clock size={18} className="text-primary" />
-                              {bookingStartTime}
-                            </div>
-                          </div>
                         </div>
 
                         <div className="space-y-1.5">
