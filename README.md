@@ -421,6 +421,15 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.7.0 (April 10, 2026)
+- **Vercel Cron Jobs Implementation**: Switched from `setInterval` to native **Vercel Cron Jobs** for production environments. This ensures that automated tasks (reminders, auto-cancellations) run reliably in serverless environments.
+- **Map UI Overhaul**:
+    - **Global Date/Time Filters**: Moved the reservation date and start time selection from individual room cards to a global filter bar at the top of the map.
+    - **Real-time Availability**: Map markers now update their status (Available, Pending, Occupied) instantly based on the globally selected date and time.
+    - **Filter Reordering**: Reorganized map filters to follow a more logical flow: Building -> Section (Frente/Trás) -> Floor -> Date -> Time.
+    - **Legend Relocation**: Moved the status legend to a fixed bar at the bottom of the map for better visibility and cleaner UI.
+- **Security**: Added `CRON_SECRET` support to protect the automated tasks endpoint from unauthorized external calls.
+
 ### Version 0.6.0 (April 10, 2026)
 - **Preparation Buffer**: Implemented a mandatory 15-minute "Verificação/Preparação" period after each booking. This buffer is visually distinct on the calendar and prevents overlapping reservations.
 - **Check-in System**: Added a mandatory check-in requirement. Librarians must perform the check-in via the "Backoffice" view. The button appears 10 minutes before and disappears 10 minutes after the scheduled start time.
