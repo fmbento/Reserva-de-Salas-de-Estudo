@@ -2887,6 +2887,15 @@ export default function App() {
                       </select>
                       <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
                       <select 
+                        value={selectedSection}
+                        onChange={(e) => setSelectedSection(e.target.value)}
+                        className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
+                      >
+                        <option value="Frente">{t.front}</option>
+                        <option value="Trás">{t.back}</option>
+                      </select>
+                      <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
+                      <select 
                         value={selectedFloor}
                         onChange={(e) => setSelectedFloor(e.target.value)}
                         className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
@@ -2894,15 +2903,6 @@ export default function App() {
                         {availableFloors.map(f => (
                           <option key={f} value={f}>{t.floor} {f}</option>
                         ))}
-                      </select>
-                      <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 self-center" />
-                      <select 
-                        value={selectedSection}
-                        onChange={(e) => setSelectedSection(e.target.value)}
-                        className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer"
-                      >
-                        <option value="Frente">{t.front}</option>
-                        <option value="Trás">{t.back}</option>
                       </select>
                     </div>
 
