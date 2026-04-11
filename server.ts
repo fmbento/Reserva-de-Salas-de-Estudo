@@ -495,10 +495,14 @@ async function checkAndSendAutomatedEmails() {
     if (roomsError) throw roomsError;
     if (usersError) throw usersError;
 
-    const roomsMap = new Map(rooms?.map(r => [r.id.toString(), r.name]));
-    const usersMap = new Map(users?.map(u => [u.id.toString(), u]));
+    const roomsMap = new Map((rooms || []).map(r => [r.id.toString(), r.name]));
+    const usersMap = new Map((users || []).map(u => [u.id.toString(), u]));
 
     for (const res of reservations) {
+      if (!res.id) {
+        console.warn("[AUTOMATION] Found reservation without ID, skipping...");
+        continue;
+      }
       const startTimeStr = res.start_time || res.startTime;
       if (!startTimeStr) continue;
 
@@ -568,8 +572,12 @@ async function checkAndSendAutomatedEmails() {
       sentEndAlerts.clear();
     }
 
-  } catch (err) {
+  } catch (err: any) {
     console.error("[AUTOMATION] Error in automated emails task:", err);
+    if (err.message) console.error("[AUTOMATION] Error Message:", err.message);
+    if (err.details) console.error("[AUTOMATION] Error Details:", err.details);
+    if (err.hint) console.error("[AUTOMATION] Error Hint:", err.hint);
+    if (err.stack) console.error("[AUTOMATION] Error Stack:", err.stack);
   }
 }
 
