@@ -1607,9 +1607,16 @@ const SchedulesView = ({
       d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1) + dragStart.day);
       setBookingDate(d.toISOString().split('T')[0]);
       setBookingStartTime(startTimeStr);
-      setBookingDuration(durationStr);
+      
+      // Find matching duration in options to ensure the select dropdown updates correctly
+      const matchedOption = DURATION_OPTIONS.find(opt => opt.mins === durationMins);
+      if (matchedOption) {
+        setBookingDuration(matchedOption.value);
+      } else {
+        setBookingDuration(durationStr);
+      }
     }
-    setIsDragging(true); // Keep selection visible
+    setIsDragging(false); // Stop dragging mode
   };
 
   const isSlotSelected = (dayIndex: number, hourStr: string, minute: number) => {
@@ -3225,7 +3232,39 @@ export default function App() {
                             />
                           </div>
 
-                          
+                          {currentView === 'schedules' && (
+                            <>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.selectDate}</label>
+                                <input 
+                                  type="date" 
+                                  value={bookingDate}
+                                  onChange={(e) => setBookingDate(e.target.value)}
+                                  className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
+                                  min={getAppDate()}
+                                />
+                              </div>
+                              
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.startTime}</label>
+                                <select 
+                                  value={bookingStartTime}
+                                  onChange={(e) => setBookingStartTime(e.target.value)}
+                                  className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
+                                >
+                                  {Array.from({ length: 64 }, (_, i) => {
+                                    const h = Math.floor(i / 4) + 8;
+                                    const m = (i % 4) * 15;
+                                    if (h >= 24) return null;
+                                    const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                    if (!isTimeAllowed(selectedBuilding, bookingDate, time)) return null;
+                                    return <option key={time} value={time}>{time}</option>;
+                                  }).filter(Boolean)}
+                                </select>
+                              </div>
+                            </>
+                          )}
+
                           <div className="space-y-1.5">
                             <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.duration}</label>
                             <select 
@@ -3350,6 +3389,50 @@ export default function App() {
                             className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm focus:border-primary focus:ring-primary"
                           />
                         </div>
+
+                        {currentView === 'schedules' && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative overflow-hidden">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Data</p>
+                              <div className="flex items-center gap-2 text-slate-900 font-bold pointer-events-none">
+                                <Calendar size={18} className="text-primary" />
+                                {(() => {
+                                  const [y, m, d] = bookingDate.split('-').map(Number);
+                                  const date = new Date(y, m - 1, d);
+                                  return date.toLocaleDateString('pt-PT', { month: 'short', day: 'numeric' });
+                                })()}
+                              </div>
+                              <input 
+                                type="date" 
+                                value={bookingDate}
+                                onChange={(e) => setBookingDate(e.target.value)}
+                                className="absolute inset-0 opacity-0 cursor-pointer z-20 w-full h-full appearance-none"
+                                min={getAppDate()}
+                              />
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Hora</p>
+                              <select 
+                                value={bookingStartTime}
+                                onChange={(e) => setBookingStartTime(e.target.value)}
+                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                              >
+                                {Array.from({ length: 64 }, (_, i) => {
+                                  const h = Math.floor(i / 4) + 8;
+                                  const m = (i % 4) * 15;
+                                  if (h >= 24) return null;
+                                  const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                  if (!isTimeAllowed(selectedBuilding, bookingDate, time)) return null;
+                                  return <option key={time} value={time}>{time}</option>;
+                                }).filter(Boolean)}
+                              </select>
+                              <div className="flex items-center gap-2 text-slate-900 font-bold">
+                                <Clock size={18} className="text-primary" />
+                                {bookingStartTime}
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.durationLabel}</label>
