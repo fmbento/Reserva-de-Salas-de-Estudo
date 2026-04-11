@@ -433,19 +433,56 @@ async function sendEndAlertEmail(email: string, roomName: string, res: any, lang
 const sentReminders = new Set<string>();
 const sentEndAlerts = new Set<string>();
 
+const APP_TIMEZONE = process.env.VITE_TIME_ZONE || 'Europe/Lisbon';
+
+function getAppNow() {
+  const now = new Date();
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: APP_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(now);
+    const getPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+    
+    return new Date(
+      parseInt(getPart('year')),
+      parseInt(getPart('month')) - 1,
+      parseInt(getPart('day')),
+      parseInt(getPart('hour')),
+      parseInt(getPart('minute')),
+      parseInt(getPart('second'))
+    );
+  } catch (e) {
+    console.error(`[TIME] Error formatting time for ${APP_TIMEZONE}, falling back to UTC:`, e);
+    return now;
+  }
+}
+
 async function checkAndSendAutomatedEmails() {
   if (!supabaseUrl || !supabaseKey) return;
 
   try {
-    const now = new Date();
-    // Use a fixed timezone if needed, but here we'll assume UTC or server time matches DB
-    const todayStr = now.toISOString().split('T')[0];
+    const now = getAppNow();
+    const todayStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+    
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${(tomorrow.getMonth() + 1).toString().padStart(2, '0')}-${tomorrow.getDate().toString().padStart(2, '0')}`;
 
-    // Fetch active reservations for today
+    console.log(`[AUTOMATION] Checking tasks for ${todayStr} (and ${tomorrowStr}) at ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')} (Timezone: ${APP_TIMEZONE})`);
+
+    // Fetch active reservations for today and tomorrow to handle midnight boundary
     const { data: reservations, error: resError } = await supabase
       .from('reservations')
       .select('*')
-      .eq('date', todayStr)
+      .or(`date.eq.${todayStr},date.eq.${tomorrowStr}`)
       .in('status', ['Confirmed', 'Occupied']);
 
     if (resError) throw resError;
@@ -467,6 +504,9 @@ async function checkAndSendAutomatedEmails() {
 
       const [startH, startM] = startTimeStr.split(':').map(Number);
       const startTime = new Date(now);
+      if (res.date === tomorrowStr) {
+        startTime.setDate(startTime.getDate() + 1);
+      }
       startTime.setHours(startH, startM, 0, 0);
 
       const duration = res.duration || 60;
@@ -483,11 +523,14 @@ async function checkAndSendAutomatedEmails() {
       const userEmail = user?.email || res.userEmail;
       const lang = (user?.lang || 'pt') as Language;
 
-      if (!userEmail) continue;
+      if (!userEmail) {
+        console.warn(`[AUTOMATION] No email found for reservation ${res.id} (User ID: ${userId})`);
+        continue;
+      }
 
       // Auto-cancellation: 10 minutes after start if not checked in (status is still 'Confirmed')
       if (res.status === 'Confirmed' && diffToStart < -10) {
-        console.log(`[AUTOMATION] Auto-cancelling reservation ${res.id} due to no-show`);
+        console.log(`[AUTOMATION] Auto-cancelling reservation ${res.id} for ${userEmail} due to no-show (diff: ${diffToStart.toFixed(2)}m)`);
         const { error: cancelError } = await supabase
           .from('reservations')
           .update({ status: 'Cancelled' })
@@ -498,27 +541,29 @@ async function checkAndSendAutomatedEmails() {
         } else {
           // Send cancellation email
           await sendReservationStatusEmail(userEmail, roomName, { ...res, startTime: startTimeStr, duration }, 'Cancelled', lang);
+          console.log(`[AUTOMATION] Auto-cancellation email sent to ${userEmail}`);
         }
         continue; // Skip other alerts for this reservation
       }
 
       // Reminder: 15 minutes before start (window: 14-16 mins)
       if (diffToStart > 14 && diffToStart <= 16 && !sentReminders.has(res.id.toString())) {
-        console.log(`[AUTOMATION] Sending reminder for reservation ${res.id}`);
+        console.log(`[AUTOMATION] Sending reminder for reservation ${res.id} to ${userEmail} (diff: ${diffToStart.toFixed(2)}m)`);
         await sendReminderEmail(userEmail, roomName, { ...res, startTime: startTimeStr, duration }, lang);
         sentReminders.add(res.id.toString());
       }
 
       // End Alert: 10 minutes before end (window: 9-11 mins)
       if (diffToEnd > 9 && diffToEnd <= 11 && !sentEndAlerts.has(res.id.toString())) {
-        console.log(`[AUTOMATION] Sending end alert for reservation ${res.id}`);
+        console.log(`[AUTOMATION] Sending end alert for reservation ${res.id} to ${userEmail} (diff: ${diffToEnd.toFixed(2)}m)`);
         await sendEndAlertEmail(userEmail, roomName, { ...res, startTime: startTimeStr, duration }, lang);
         sentEndAlerts.add(res.id.toString());
       }
     }
 
-    // Periodically clear old IDs from sets (e.g., every day)
+    // Periodically clear old IDs from sets (e.g., every day at midnight Lisbon time)
     if (now.getHours() === 0 && now.getMinutes() === 0) {
+      console.log("[AUTOMATION] Clearing sent alerts tracking sets for the new day");
       sentReminders.clear();
       sentEndAlerts.clear();
     }
