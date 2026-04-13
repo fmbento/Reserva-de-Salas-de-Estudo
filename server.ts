@@ -517,7 +517,8 @@ async function checkAndSendAutomatedEmails() {
 
     // Fetch rooms and users for lookup
     const { data: rooms, error: roomsError } = await supabase.from('rooms').select('id, name');
-    const { data: users, error: usersError } = await supabase.from('users').select('id, email, lang');
+    // We don't fetch 'lang' from users anymore since it might not exist and we prefer the reservation's lang
+    const { data: users, error: usersError } = await supabase.from('users').select('id, email');
 
     if (roomsError) throw roomsError;
     if (usersError) throw usersError;
@@ -552,7 +553,9 @@ async function checkAndSendAutomatedEmails() {
       const user = usersMap.get(userId);
       const roomName = roomsMap.get(roomId) || 'Sala';
       const userEmail = user?.email || res.userEmail;
-      const lang = (user?.lang || 'pt') as Language;
+      
+      // Use language from reservation, fallback to 'pt'
+      const lang = (res.lang || 'pt') as Language;
 
       if (!userEmail) {
         console.warn(`[AUTOMATION] No email found for reservation ${res.id} (User ID: ${userId})`);
