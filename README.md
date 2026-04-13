@@ -421,6 +421,12 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.7.1 (April 13, 2026)
+- **Timezone Synchronization**: Fixed a critical issue where automated tasks (reminders/cancellations) used server UTC time instead of the application's timezone (Lisbon).
+- **Duration Parsing Fix**: Improved robustness of email notifications and ICS generation by implementing a smart duration parser that handles both raw numbers and formatted strings (e.g., "1 Hora e 30 Minutos").
+- **Language Localization**: Automated emails now respect the user's interface language at the time of booking.
+- **Supabase Schema Alignment**: Fixed errors related to missing columns in Supabase by ensuring the application gracefully handles schema mismatches and providing SQL migration instructions.
+
 ### Version 0.7.0 (April 10, 2026)
 - **Vercel Cron Jobs Implementation**: Switched from `setInterval` to native **Vercel Cron Jobs** for production environments. This ensures that automated tasks (reminders, auto-cancellations) run reliably in serverless environments.
 - **Map UI Overhaul**:
@@ -511,7 +517,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** April 10, 2026
+**Last Updated:** April 13, 2026
 ```
 
 This README provides:
