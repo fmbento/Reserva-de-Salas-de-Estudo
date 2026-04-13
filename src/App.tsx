@@ -2165,7 +2165,8 @@ export default function App() {
             startTime: r.startTime || r.start_time,
             duration: r.duration >= 60 ? `${Math.floor(r.duration / 60)} Hora${r.duration >= 120 ? 's' : ''}${r.duration % 60 > 0 ? ' e ' + (r.duration % 60) : ''}` : `${r.duration} Minutos`,
             subject: r.subject,
-            status: r.status
+            status: r.status,
+            lang: r.lang
           };
         });
         setReservations(mappedReservations);
@@ -2410,7 +2411,8 @@ export default function App() {
           start_time: activeStartTime,
           duration: durationMins,
           subject: bookingSubject,
-          status: 'Pending'
+          status: 'Pending',
+          lang: lang
         });
 
       if (insertError) throw insertError;
@@ -2529,7 +2531,7 @@ export default function App() {
             roomName: res.roomName,
             reservation: res,
             status,
-            lang
+            lang: res.lang || lang
           })
         }).catch(console.error);
       }
