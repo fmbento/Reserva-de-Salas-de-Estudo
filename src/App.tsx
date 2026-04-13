@@ -2410,8 +2410,7 @@ export default function App() {
           start_time: activeStartTime,
           duration: durationMins,
           subject: bookingSubject,
-          status: 'Pending',
-          lang: lang
+          status: 'Pending'
         });
 
       if (insertError) throw insertError;
