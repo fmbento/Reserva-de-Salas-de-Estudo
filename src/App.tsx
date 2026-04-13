@@ -85,6 +85,7 @@ interface Reservation {
   duration: string;
   subject?: string;
   status: 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled' | 'Occupied';
+  lang?: string;
 }
 
 interface UserData {
