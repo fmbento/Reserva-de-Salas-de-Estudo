@@ -99,7 +99,34 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-function formatReservationTime(startTime: string, durationMinutes: number, lang: Language = 'pt') {
+function parseDuration(duration: any): number {
+  if (typeof duration === 'number') return duration;
+  if (typeof duration !== 'string') return 60;
+  
+  // Handle "X Hora(s) e Y Minutos" or "X Minutos"
+  let totalMinutes = 0;
+  const normalized = duration.toLowerCase();
+  
+  if (normalized.includes('hora')) {
+    const parts = normalized.split(' ');
+    const hours = parseInt(parts[0]);
+    if (!isNaN(hours)) totalMinutes += hours * 60;
+    
+    if (normalized.includes(' e ')) {
+      const minParts = normalized.split(' e ');
+      const mins = parseInt(minParts[1]);
+      if (!isNaN(mins)) totalMinutes += mins;
+    }
+  } else {
+    const mins = parseInt(normalized);
+    if (!isNaN(mins)) totalMinutes = mins;
+  }
+  
+  return totalMinutes || 60;
+}
+
+function formatReservationTime(startTime: string, duration: any, lang: Language = 'pt') {
+  const durationMinutes = parseDuration(duration);
   const [h, m] = startTime.split(':').map(Number);
   const startTotal = h * 60 + m;
   const endTotal = startTotal + durationMinutes;
@@ -163,7 +190,7 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
     
     const event: ics.EventAttributes = {
       start: [year, month, day, hour, minute],
-      duration: { minutes: res.duration },
+      duration: { minutes: parseDuration(res.duration) },
       title: `Reserva SiReS: ${roomName}`,
       description: res.subject || 'Reserva de sala de estudo',
       location: `Universidade de Aveiro - ${roomName}`,
@@ -513,7 +540,7 @@ async function checkAndSendAutomatedEmails() {
       }
       startTime.setHours(startH, startM, 0, 0);
 
-      const duration = res.duration || 60;
+      const duration = parseDuration(res.duration || 60);
       const endTime = new Date(startTime);
       endTime.setMinutes(endTime.getMinutes() + duration);
 
