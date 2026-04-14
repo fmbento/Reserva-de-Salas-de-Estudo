@@ -254,6 +254,7 @@ The application uses **Supabase** for data persistence and real-time features. T
 - `amenities`: JSONB (Default: '[]')
 - `top`: Text
 - `left`: Text
+- `notes`: Text (Maintenance/ELD notes)
 
 #### Reservations Table
 - `id`: UUID (Primary Key)
@@ -421,6 +422,11 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.7.2 (April 14, 2026)
+- **Maintenance/ELD Status**: Renamed "Maintenance" status to "Maintenance/ELD" (Empréstimo de Longa Duração) to better reflect room unavailability scenarios.
+- **Room Maintenance Notes**: Added a `notes` field to the Rooms table. Librarians can now add specific details (e.g., "Unavailable until 20/04 for painting") when a room is in Maintenance/ELD mode.
+- **UI Enhancements**: Maintenance notes are now displayed to users when they attempt to view or book a room that is unavailable.
+
 ### Version 0.7.1 (April 13, 2026)
 - **Timezone Synchronization**: Fixed a critical issue where automated tasks (reminders/cancellations) used server UTC time instead of the application's timezone (Lisbon).
 - **Duration Parsing Fix**: Improved robustness of email notifications and ICS generation by implementing a smart duration parser that handles both raw numbers and formatted strings (e.g., "1 Hora e 30 Minutos").
@@ -517,7 +523,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** April 13, 2026
+**Last Updated:** April 14, 2026
 ```
 
 This README provides:

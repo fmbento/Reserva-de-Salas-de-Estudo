@@ -73,6 +73,7 @@ interface Room {
   image: string;
   top: string;
   left: string;
+  notes?: string;
 }
 
 interface Reservation {
@@ -1007,6 +1008,7 @@ const ManageRoomsView = ({
   const [editStatus, setEditStatus] = useState<OperationalStatus>('Active');
   const [editAmenities, setEditAmenities] = useState<string[]>([]);
   const [editImage, setEditImage] = useState('');
+  const [editNotes, setEditNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -1023,6 +1025,7 @@ const ManageRoomsView = ({
       setEditStatus(selectedRoom.operationalStatus || 'Active');
       setEditAmenities(selectedRoom.amenities || []);
       setEditImage(selectedRoom.image || '');
+      setEditNotes(selectedRoom.notes || '');
     }
   }, [selectedRoom, isAddingNew]);
 
@@ -1041,6 +1044,7 @@ const ManageRoomsView = ({
     setEditStatus('Active');
     setEditAmenities([]);
     setEditImage('');
+    setEditNotes('');
   };
 
   const handleSave = async () => {
@@ -1057,7 +1061,8 @@ const ManageRoomsView = ({
       capacity: editCapacity,
       operationalStatus: editStatus,
       amenities: editAmenities,
-      image: editImage
+      image: editImage,
+      notes: editNotes
     };
 
     if (isAddingNew) {
@@ -1421,6 +1426,18 @@ const ManageRoomsView = ({
                       {editStatus === 'Maintenance' && <div className="h-2.5 w-2.5 rounded-full bg-amber-600" />}
                     </div>
                   </button>
+
+                  {editStatus === 'Maintenance' && (
+                    <div className="space-y-1.5 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{t.notesLabel}</label>
+                      <textarea 
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        placeholder="Ex: Indisponível até 20/04 por pintura."
+                        className="w-full rounded-xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-sm focus:border-primary focus:ring-primary text-slate-900 dark:text-white transition-colors min-h-[80px] resize-none"
+                      />
+                    </div>
+                  )}
 
                   <button 
                     onClick={() => setEditStatus('Inactive')}
@@ -3219,7 +3236,16 @@ export default function App() {
                         <div className="p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-900/30 rounded-xl text-rose-700 dark:text-rose-400 text-sm font-medium flex items-center gap-3">
                           <AlertCircle size={20} />
                           {selectedRoom.operationalStatus === 'Maintenance' 
-                            ? t.roomMaintenance 
+                            ? (
+                              <div className="flex flex-col gap-1">
+                                <div>{t.roomMaintenance}</div>
+                                {selectedRoom.notes && (
+                                  <div className="text-xs opacity-80 italic">
+                                    {selectedRoom.notes}
+                                  </div>
+                                )}
+                              </div>
+                            )
                             : t.roomInactive}
                         </div>
                       ) : (

@@ -147,6 +147,7 @@ export interface TranslationKeys {
   statusCompleted: string;
   statusMaintenance: string;
   statusInactive: string;
+  notesLabel: string;
   status: string;
 
   // Reservations View
@@ -383,7 +384,7 @@ export const translations: Record<Language, TranslationKeys> = {
     pax: "pax",
     amenities: "Comodidades",
     bookThisSpace: "Reservar este Espaço",
-    roomMaintenance: "Sala em Manutenção",
+    roomMaintenance: "Sala em Manutenção/ELD",
     roomInactive: "Sala Inativa",
     subjectLabel: "Assunto da Reserva",
     dateLabel: "Data",
@@ -408,8 +409,9 @@ export const translations: Record<Language, TranslationKeys> = {
     statusOccupied: "Ocupada",
     statusCancelled: "Cancelada",
     statusCompleted: "Concluída",
-    statusMaintenance: "Manutenção",
+    statusMaintenance: "Manutenção/ELD",
     statusInactive: "Inativa",
+    notesLabel: "Notas de Manutenção/ELD",
     status: "Estado",
 
     // Reservations View
@@ -455,7 +457,7 @@ export const translations: Record<Language, TranslationKeys> = {
     edit: "Editar",
     activate: "Ativar",
     deactivate: "Desativar",
-    maintenance: "Manutenção",
+    maintenance: "Manutenção/ELD",
     save: "Guardar Alterações",
     editDetails: "Editar Detalhes",
     editing: "A editar",
@@ -464,7 +466,7 @@ export const translations: Record<Language, TranslationKeys> = {
     imageUrlPlaceholder: "URL da Imagem...",
     statusControl: "Controlo de Estado",
     activateRoom: "Ativar Sala",
-    maintenanceMode: "Manutenção",
+    maintenanceMode: "Manutenção/ELD",
     deactivateRoom: "Desativar",
     add: "Adicionar",
     all: "Todas",
@@ -644,7 +646,7 @@ export const translations: Record<Language, TranslationKeys> = {
     pax: "pax",
     amenities: "Amenities",
     bookThisSpace: "Book this Space",
-    roomMaintenance: "Room in Maintenance",
+    roomMaintenance: "Room in Maintenance/ELD",
     roomInactive: "Room Inactive",
     subjectLabel: "Booking Subject",
     dateLabel: "Date",
@@ -669,8 +671,9 @@ export const translations: Record<Language, TranslationKeys> = {
     statusOccupied: "Occupied",
     statusCancelled: "Cancelled",
     statusCompleted: "Completed",
-    statusMaintenance: "Maintenance",
+    statusMaintenance: "Maintenance/ELD",
     statusInactive: "Inactive",
+    notesLabel: "Maintenance/ELD Notes",
     status: "Status",
 
     // Reservations View
@@ -716,7 +719,7 @@ export const translations: Record<Language, TranslationKeys> = {
     edit: "Edit",
     activate: "Activate",
     deactivate: "Deactivate",
-    maintenance: "Maintenance",
+    maintenance: "Maintenance/ELD",
     save: "Save Changes",
     editDetails: "Edit Details",
     editing: "Editing",
@@ -725,7 +728,7 @@ export const translations: Record<Language, TranslationKeys> = {
     imageUrlPlaceholder: "Image URL...",
     statusControl: "Status Control",
     activateRoom: "Activate Room",
-    maintenanceMode: "Maintenance",
+    maintenanceMode: "Maintenance/ELD",
     deactivateRoom: "Deactivate",
     add: "Add",
     all: "All",
