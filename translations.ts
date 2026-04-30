@@ -71,6 +71,9 @@ export interface TranslationKeys {
   overlapUserLongError: string;
   sessionExpiredError: string;
   timeConflict: string;
+  maxDailyReservationsError: string;
+  maxWeeklyReservationsError: string;
+  reservationWindowError: string;
   bookingSuccess: string;
   subjectPlaceholder: string;
   durationLabel: string;
@@ -335,6 +338,9 @@ export const translations: Record<Language, TranslationKeys> = {
     overlapUserLongError: "Já possui uma reserva ativa que se sobrepõe a este horário. Se desejar manter esta nova marcação, deverá primeiro apagar a(s) outra(s) reserva(s) que fez antes para parte do tempo que agora estava a marcar, e voltar a inserir a reserva pretendida.",
     sessionExpiredError: "A sua sessão expirou ou o utilizador não foi encontrado. Por favor, faça login novamente.",
     timeConflict: "Conflito de horário.",
+    maxDailyReservationsError: "Atingiu o limite de {n} reservas por dia.",
+    maxWeeklyReservationsError: "Atingiu o limite de {n} reservas por semana (Seg-Dom).",
+    reservationWindowError: "A reserva só é possível para as próximas 48h a contar do próximo slot de 15 min.",
     bookingSuccess: "Reserva efetuada com sucesso! O seu pedido está pendente de aprovação.",
     subjectPlaceholder: "Ex: Estudo de Grupo, Reunião de Projeto",
     durationLabel: "Duração",
@@ -597,6 +603,9 @@ export const translations: Record<Language, TranslationKeys> = {
     overlapUserLongError: "You already have an active reservation that overlaps with this time. If you wish to keep this new booking, you must first delete the other reservation(s) you made before for part of the time you were now booking, and re-insert the desired reservation.",
     sessionExpiredError: "Your session has expired or the user was not found. Please login again.",
     timeConflict: "Time conflict.",
+    maxDailyReservationsError: "You reached the limit of {n} reservations per day.",
+    maxWeeklyReservationsError: "You reached the limit of {n} reservations per week (Mon-Sun).",
+    reservationWindowError: "Reservations are only possible within the next 48h from the next 15 min slot.",
     bookingSuccess: "Booking successful! Your request is pending approval.",
     subjectPlaceholder: "Ex: Group Study, Project Meeting",
     durationLabel: "Duration",

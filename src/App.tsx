@@ -163,6 +163,9 @@ const OPERATING_HOURS = (() => {
 
 const MAX_BOOKING_DURATION_MINS = parseInt(import.meta.env.VITE_MAX_BOOKING_DURATION_MINS || '240');
 const BUFFER_DURATION_MINS = 15;
+const MAX_DAILY_RESERVATIONS = 3;
+const MAX_WEEKLY_RESERVATIONS = 5;
+const RESERVATION_WINDOW_HOURS = 48;
 
 const isTimeAllowed = (buildingId: string, dateStr: string, timeStr: string) => {
   const hoursConfig = OPERATING_HOURS[buildingId];
@@ -2000,7 +2003,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice' | 'manage-rooms' | 'manage-users'>('map');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [floorPlanMaps, setFloorPlanMaps] = useState<Record<string, string>>({});
-  const [selectedRoomId, setSelectedRoomId] = useState<string>('101');
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(import.meta.env.VITE_DEFAULT_ROOM_ID || '101');
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [allUsers, setAllUsers] = useState<UserData[]>([]);
@@ -2033,9 +2036,9 @@ export default function App() {
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
   const [bookingMessage, setBookingMessage] = useState<string>('');
   
-  const [selectedBuilding, setSelectedBuilding] = useState('17');
-  const [selectedFloor, setSelectedFloor] = useState('2');
-  const [selectedSection, setSelectedSection] = useState('Trás');
+  const [selectedBuilding, setSelectedBuilding] = useState(import.meta.env.VITE_DEFAULT_BUILDING || '17');
+  const [selectedFloor, setSelectedFloor] = useState(import.meta.env.VITE_DEFAULT_FLOOR || '2');
+  const [selectedSection, setSelectedSection] = useState(import.meta.env.VITE_DEFAULT_SECTION || 'Trás');
 
   const availableFloors = useMemo(() => {
     const floors = new Set<string>();
@@ -2261,6 +2264,60 @@ export default function App() {
   const handleConfirmBooking = async (forcedDuration?: number, forcedStartTime?: string) => {
     const now = getAppNow();
     const activeStartTime = forcedStartTime || bookingStartTime;
+
+    // Rule 3: 48h Window from next 15min slot
+    const nextSlot = getAppNextSlot();
+    const nextSlotDateStr = `${nextSlot.date}T${nextSlot.time}:00`;
+    const nextSlotDate = new Date(nextSlotDateStr);
+    const maxWindowDate = new Date(nextSlotDate.getTime() + RESERVATION_WINDOW_HOURS * 60 * 60 * 1000);
+    const requestedStartTime = new Date(`${bookingDate}T${activeStartTime}:00`);
+    
+    if (requestedStartTime > maxWindowDate) {
+      setBookingStatus('error');
+      setBookingMessage(t.reservationWindowError);
+      return;
+    }
+
+    // Rule 1: Max 3 reservations per day
+    const dailyCount = reservations.filter(res => 
+      res.userId === currentUser?.id && 
+      res.date === bookingDate && 
+      res.status !== 'Cancelled'
+    ).length;
+
+    if (dailyCount >= MAX_DAILY_RESERVATIONS) {
+      setBookingStatus('error');
+      setBookingMessage(t.maxDailyReservationsError.replace('{n}', MAX_DAILY_RESERVATIONS.toString()));
+      return;
+    }
+
+    // Rule 2: Max 5 reservations per calendar week (Monday to Sunday)
+    const getMonday = (d: Date) => {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(date.setDate(diff));
+    };
+
+    const requestedDateObj = new Date(`${bookingDate}T00:00:00`);
+    const mondayOfRequestedWeek = getMonday(requestedDateObj);
+    mondayOfRequestedWeek.setHours(0, 0, 0, 0);
+    const sundayOfRequestedWeek = new Date(mondayOfRequestedWeek);
+    sundayOfRequestedWeek.setDate(mondayOfRequestedWeek.getDate() + 6);
+    sundayOfRequestedWeek.setHours(23, 59, 59, 999);
+
+    const weeklyCount = reservations.filter(res => {
+      if (res.userId !== currentUser?.id || res.status === 'Cancelled') return false;
+      const resDate = new Date(`${res.date}T00:00:00`);
+      return resDate >= mondayOfRequestedWeek && resDate <= sundayOfRequestedWeek;
+    }).length;
+
+    if (weeklyCount >= MAX_WEEKLY_RESERVATIONS) {
+      setBookingStatus('error');
+      setBookingMessage(t.maxWeeklyReservationsError.replace('{n}', MAX_WEEKLY_RESERVATIONS.toString()));
+      return;
+    }
+
     const [h, m] = activeStartTime.split(':').map(Number);
     const bDate = new Date(bookingDate + 'T00:00:00');
     bDate.setHours(h, m, 0, 0);

@@ -154,6 +154,12 @@ SMTP_FROM="SiReS Bibliotecas UA" <your-email@gmail.com>
 
 # Google Gemini API (optional, for AI features)
 GEMINI_API_KEY=your-api-key-here
+
+# Default View Configuration
+VITE_DEFAULT_ROOM_ID=17.3.18
+VITE_DEFAULT_BUILDING=17
+VITE_DEFAULT_FLOOR=3
+VITE_DEFAULT_SECTION=Frente
 ```
 
 **Important:** 
@@ -422,6 +428,9 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.7.3 (April 30, 2026)
+- **Default View Configuration**: Added environment variables (`VITE_DEFAULT_ROOM_ID`, `VITE_DEFAULT_BUILDING`, etc.) to configure which room and map area are displayed by default when the application starts.
+
 ### Version 0.7.2 (April 14, 2026)
 - **Maintenance/ELD Status**: Renamed "Maintenance" status to "Maintenance/ELD" (Empréstimo de Longa Duração) to better reflect room unavailability scenarios.
 - **Room Maintenance Notes**: Added a `notes` field to the Rooms table. Librarians can now add specific details (e.g., "Unavailable until 20/04 for painting") when a room is in Maintenance/ELD mode.
@@ -523,7 +532,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** April 14, 2026
+**Last Updated:** April 30, 2026
 ```
 
 This README provides:
