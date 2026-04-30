@@ -10,6 +10,8 @@ The system features:
 - 📧 Email notifications for reservations
 - 🗓️ Calendar integration (ICS format)
 - ⏱️ Mandatory 15-minute preparation buffer between bookings
+- 📊 Reservation limits: Max 3 per day, 5 per week
+- 🕒 48-hour advanced booking window
 - 📲 Librarian-managed check-in system via Backoffice (available 10 min before/after start)
 - 🔔 Automated email reminders and end-of-reservation alerts
 - 👥 Role-based access control (User, Librarian, Admin)
@@ -125,6 +127,18 @@ Modify the `.env` file before running `docker-compose up`:
 ```bash
 docker-compose up --build -d
 ```
+
+---
+
+## 📑 Booking Rules
+
+To ensure fair access to study spaces, the following rules are enforced:
+
+1.  **Preparation Buffer**: A mandatory 15-minute slot is automatically added between bookings for room preparation and transition.
+2.  **Daily Limit**: Each user can have a maximum of **3 reservations per day**.
+3.  **Weekly Limit**: Each user can have a maximum of **5 reservations per calendar week** (Monday to Sunday).
+4.  **Booking Window**: Reservations are only possible within the **next 48 hours**, starting from the next available 15-minute slot from the current time.
+5.  **Check-in**: Users must check in with a librarian at the desk between 10 minutes before and 10 minutes after the reservation start time. Failure to check in results in automatic cancellation.
 
 ---
 
@@ -427,6 +441,12 @@ For support, please contact:
 ---
 
 ## 🔄 Changelog
+
+### Version 0.7.4 (April 30, 2026)
+- **Reservation Limits**: Implemented new business rules for reservations:
+    - **Daily Limit**: Users are restricted to a maximum of 3 reservations per day.
+    - **Weekly Limit**: Users are restricted to a maximum of 5 reservations per calendar week (Monday to Sunday).
+    - **Reservation Window**: Reservations can only be made within a 48-hour window starting from the next available 15-minute slot.
 
 ### Version 0.7.3 (April 30, 2026)
 - **Default View Configuration**: Added environment variables (`VITE_DEFAULT_ROOM_ID`, `VITE_DEFAULT_BUILDING`, etc.) to configure which room and map area are displayed by default when the application starts.
