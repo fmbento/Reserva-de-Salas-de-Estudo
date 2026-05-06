@@ -2040,6 +2040,55 @@ export default function App() {
   const [selectedFloor, setSelectedFloor] = useState(import.meta.env.VITE_DEFAULT_FLOOR || '2');
   const [selectedSection, setSelectedSection] = useState(import.meta.env.VITE_DEFAULT_SECTION || 'Trás');
 
+  // Deep Linking logic
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const path = window.location.pathname;
+      const match = path.match(/^\/sala\/([^\/]+)$/);
+      if (match) {
+        const roomId = match[1];
+        setSelectedRoomId(roomId);
+        setCurrentView('schedules');
+        
+        // If rooms are loaded, find matching room to update location state
+        if (rooms.length > 0) {
+          const room = rooms.find(r => r.id === roomId);
+          if (room) {
+            setSelectedBuilding(room.building);
+            setSelectedFloor(room.floor);
+            setSelectedSection(room.section);
+          }
+        }
+      } else if (path === '/' || path === '') {
+        // Handle home path if needed
+      }
+    };
+
+    // Run on mount
+    handleUrlChange();
+
+    // Listen for back/forward browser navigation
+    window.addEventListener('popstate', handleUrlChange);
+    return () => window.removeEventListener('popstate', handleUrlChange);
+  }, [rooms.length > 0]); // Re-run once rooms are actually loaded to sync map location
+
+  // Update URL when view changes or room changes
+  useEffect(() => {
+    if (currentView === 'schedules' && selectedRoomId) {
+      const newPath = `/sala/${selectedRoomId}`;
+      if (window.location.pathname !== newPath) {
+        window.history.pushState({ view: 'schedules', roomId: selectedRoomId }, '', newPath);
+      }
+    } else if (currentView === 'map') {
+      if (window.location.pathname !== '/' && window.location.pathname !== '') {
+        window.history.pushState({ view: 'map' }, '', '/');
+      }
+    } else {
+      // For other views like reservations or backoffice, we could also have URLs if desired
+      // but for now let's just keep them as is or reset to root if they don't have subpaths
+    }
+  }, [currentView, selectedRoomId]);
+
   const availableFloors = useMemo(() => {
     const floors = new Set<string>();
     Object.keys(floorPlanMaps).forEach(key => {

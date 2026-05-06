@@ -139,6 +139,7 @@ To ensure fair access to study spaces, the following rules are enforced:
 3.  **Weekly Limit**: Each user can have a maximum of **5 reservations per calendar week** (Monday to Sunday).
 4.  **Booking Window**: Reservations are only possible within the **next 48 hours**, starting from the next available 15-minute slot from the current time.
 5.  **Check-in**: Users must check in with a librarian at the desk between 10 minutes before and 10 minutes after the reservation start time. Failure to check in results in automatic cancellation.
+6.  **Deep Linking**: Direct URLs for rooms are supported in the format `/sala/{ROOM_ID}` (e.g., `/sala/17.3.18`). This allows for QR code creation and direct sharing.
 
 ---
 
@@ -442,6 +443,11 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.7.5 (May 6, 2026)
+- **Deep Linking**: Implemented support for direct room URLs (`/sala/{roomId}`).
+- **Navigation Sync**: The application now matches the specific building, floor, and section when a deep link is used to ensure consistency when switching back to the map view.
+- **Browser History**: Integrated `window.history` to allow sharing specific room schedules and using browser back/forward buttons for navigation.
+
 ### Version 0.7.4 (April 30, 2026)
 - **Reservation Limits**: Implemented new business rules for reservations:
     - **Daily Limit**: Users are restricted to a maximum of 3 reservations per day.
@@ -552,7 +558,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** April 30, 2026
+**Last Updated:** May 06, 2026
 ```
 
 This README provides:
