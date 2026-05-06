@@ -1520,6 +1520,7 @@ const SchedulesView = ({
   setBookingStartTime,
   setBookingDuration,
   onNewBooking,
+  maxBookingWindow,
   lang
 }: { 
   rooms: Room[], 
@@ -1530,6 +1531,7 @@ const SchedulesView = ({
   setBookingStartTime: (time: string) => void,
   setBookingDuration: (duration: string) => void,
   onNewBooking: () => void,
+  maxBookingWindow: Date,
   lang: string
 }) => {
   const t = translations[lang as keyof typeof translations];
@@ -1578,8 +1580,16 @@ const SchedulesView = ({
     return slotDate < now;
   };
 
+  const isSlotBeyondWindow = (dayIndex: number, hourStr: string, minute: number) => {
+    const slotDate = new Date(currentDate);
+    slotDate.setDate(slotDate.getDate() - (slotDate.getDay() === 0 ? 6 : slotDate.getDay() - 1) + dayIndex);
+    const hour = parseInt(hourStr.split(':')[0]);
+    slotDate.setHours(hour, minute, 0, 0);
+    return slotDate > maxBookingWindow;
+  };
+
   const handleMouseDown = (dayIndex: number, hourStr: string, minute: number) => {
-    if (isSlotOccupied(dayIndex, hourStr, minute) || isSlotInPast(dayIndex, hourStr, minute)) return;
+    if (isSlotOccupied(dayIndex, hourStr, minute) || isSlotInPast(dayIndex, hourStr, minute) || isSlotBeyondWindow(dayIndex, hourStr, minute)) return;
     
     const hour = parseInt(hourStr.split(':')[0]);
     setDragStart({ day: dayIndex, hour, minute });
@@ -1589,8 +1599,8 @@ const SchedulesView = ({
 
   const handleMouseEnter = (dayIndex: number, hourStr: string, minute: number) => {
     if (isDragging && dragStart && dayIndex === dragStart.day) {
-      if (isSlotOccupied(dayIndex, hourStr, minute) || isSlotInPast(dayIndex, hourStr, minute)) {
-        // Stop dragging if we hit an occupied or past slot
+      if (isSlotOccupied(dayIndex, hourStr, minute) || isSlotInPast(dayIndex, hourStr, minute) || isSlotBeyondWindow(dayIndex, hourStr, minute)) {
+        // Stop dragging if we hit an occupied, past or beyond window slot
         handleMouseUp();
         return;
       }
@@ -1908,11 +1918,11 @@ const SchedulesView = ({
                           onMouseDown={() => handleMouseDown(dayIndex, hour, minute)}
                           onMouseEnter={() => handleMouseEnter(dayIndex, hour, minute)}
                           onMouseUp={handleMouseUp}
-                          disabled={isSlotOccupied(dayIndex, hour, minute) || isSlotInPast(dayIndex, hour, minute)}
+                          disabled={isSlotOccupied(dayIndex, hour, minute) || isSlotInPast(dayIndex, hour, minute) || isSlotBeyondWindow(dayIndex, hour, minute)}
                           className={`flex-1 transition-colors border-b border-slate-50 last:border-0 group relative ${
                             isSlotSelected(dayIndex, hour, minute) ? 'bg-primary/20' : 
                             isSlotOccupied(dayIndex, hour, minute) ? 'cursor-not-allowed' : 
-                            isSlotInPast(dayIndex, hour, minute) ? 'bg-slate-50 cursor-not-allowed' : 'hover:bg-primary/5'
+                            isSlotInPast(dayIndex, hour, minute) || isSlotBeyondWindow(dayIndex, hour, minute) ? 'bg-slate-50 cursor-not-allowed' : 'hover:bg-primary/5'
                           }`}
                         >
                           <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none z-20">
@@ -2028,6 +2038,12 @@ export default function App() {
     };
   }, [showUserSwitcher]);
   
+  const maxBookingWindow = useMemo(() => {
+    const nextSlot = getAppNextSlot();
+    const nextSlotDate = new Date(`${nextSlot.date}T${nextSlot.time}:00`);
+    return new Date(nextSlotDate.getTime() + RESERVATION_WINDOW_HOURS * 60 * 60 * 1000);
+  }, [currentView, selectedRoomId]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [mapScale, setMapScale] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768 ? 0.6 : 1);
@@ -3148,6 +3164,7 @@ export default function App() {
                 setBookingStartTime={setBookingStartTime}
                 setBookingDuration={setBookingDuration}
                 onNewBooking={() => setCurrentView('map')}
+                maxBookingWindow={maxBookingWindow}
                 lang={lang}
               />
             ) : currentView === 'reservations' ? (
@@ -3377,6 +3394,7 @@ export default function App() {
                                   onChange={(e) => setBookingDate(e.target.value)}
                                   className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
                                   min={getAppDate()}
+                                  max={getAppDate(maxBookingWindow)}
                                 />
                               </div>
                               
@@ -3393,6 +3411,11 @@ export default function App() {
                                     if (h >= 24) return null;
                                     const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
                                     if (!isTimeAllowed(selectedBuilding, bookingDate, time)) return null;
+
+                                    // 48h limit
+                                    const requestedStartTime = new Date(`${bookingDate}T${time}:00`);
+                                    if (requestedStartTime > maxBookingWindow) return null;
+
                                     return <option key={time} value={time}>{time}</option>;
                                   }).filter(Boolean)}
                                 </select>

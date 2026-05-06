@@ -443,6 +443,10 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.7.6 (May 6, 2026)
+- **Visual Booking Window**: Time slots beyond the 48-hour reservation window are now visually disabled in the "Schedules" grid and filtered out from the start time selection dropdown.
+- **Improved Consistency**: Unified the 48-hour limit calculation between the interactive grid and the booking sidebar.
+
 ### Version 0.7.5 (May 6, 2026)
 - **Deep Linking**: Implemented support for direct room URLs (`/sala/{roomId}`).
 - **Navigation Sync**: The application now matches the specific building, floor, and section when a deep link is used to ensure consistency when switching back to the map view.
