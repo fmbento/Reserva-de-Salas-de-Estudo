@@ -139,7 +139,8 @@ To ensure fair access to study spaces, the following rules are enforced:
 3.  **Weekly Limit**: Each user can have a maximum of **5 reservations per calendar week** (Monday to Sunday).
 4.  **Booking Window**: Reservations are only possible within the **next 48 hours**, starting from the next available 15-minute slot from the current time.
 5.  **Check-in**: Users must check in with a librarian at the desk between 10 minutes before and 10 minutes after the reservation start time. Failure to check in results in automatic cancellation.
-6.  **Deep Linking**: Direct URLs for rooms are supported in the format `/sala/{ROOM_ID}` (e.g., `/sala/17.3.18`). This allows for QR code creation and direct sharing.
+6.  **Deep Linking**: Direct URLs for rooms are supported in the format `/sala/{ROOM_ID}` (e.g., `/sala/17.3.18`). This allows for QR code creation and direct sharing. Deep links navigate to a specialized "Room Details" list view showing availability for the next 2-3 days.
+7.  **Preparation Buffer**: A mandatory 15-minute preparation buffer is enforced between all bookings and is visually respected in both the calendar and list views.
 
 ---
 
@@ -443,6 +444,13 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.7.7 (May 8, 2026)
+- **Room Details View**: Introduced a new specialized view for direct room access via deep links.
+- **Availability List**: Deep links (`/sala/{roomId}`) now navigate to a dedicated list view showing available time slots for the next 2-3 days.
+- **Extended Visibility**: The last "Free" block of the day now extends by 4 hours (the maximum reservation duration) to correctly represent the room's booking potential beyond standard operating hours.
+- **Buffer Management**: Implemented a mandatory 15-minute buffer between slots in the Room Details list, ensuring transition time between bookings.
+- **Interactive Booking**: Users can click "Livre" (Free) slots to immediately initiate a reservation with pre-filled details.
+
 ### Version 0.7.6 (May 6, 2026)
 - **Visual Booking Window**: Time slots beyond the 48-hour reservation window are now visually disabled in the "Schedules" grid and filtered out from the start time selection dropdown.
 - **Improved Consistency**: Unified the 48-hour limit calculation between the interactive grid and the booking sidebar.
@@ -562,7 +570,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** May 06, 2026
+**Last Updated:** May 08, 2026
 ```
 
 This README provides:

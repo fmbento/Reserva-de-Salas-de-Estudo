@@ -40,7 +40,8 @@ import {
   Moon,
   Globe,
   ShieldCheck,
-  UserX
+  UserX,
+  ArrowLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cookies from 'js-cookie';
@@ -1511,6 +1512,265 @@ const ManageRoomsView = ({
   );
 };
 
+const RoomDetailsView = ({ 
+  rooms, 
+  reservations,
+  selectedRoomId, 
+  setSelectedRoomId,
+  bookingDate,
+  bookingStartTime,
+  setBookingDate, 
+  setBookingStartTime,
+  setBookingDuration,
+  onNewBooking,
+  maxBookingWindow,
+  lang,
+  setCurrentView
+}: { 
+  rooms: Room[], 
+  reservations: Reservation[],
+  selectedRoomId: string, 
+  setSelectedRoomId: (id: string) => void,
+  bookingDate: string,
+  bookingStartTime: string,
+  setBookingDate: (date: string) => void,
+  setBookingStartTime: (time: string) => void,
+  setBookingDuration: (duration: string) => void,
+  onNewBooking: () => void,
+  maxBookingWindow: Date,
+  lang: string,
+  setCurrentView: (view: any) => void
+}) => {
+  const t = translations[lang as keyof typeof translations];
+  const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+
+  const getDayBlocks = (date: Date) => {
+    if (!selectedRoom) return [];
+    
+    const buildingId = selectedRoom.building;
+    const dateStr = getAppDate(date);
+    
+    const hoursConfig = OPERATING_HOURS[buildingId];
+    if (!hoursConfig) return [];
+    
+    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    const dayName = dayNames[date.getDay()];
+    const dayHours = hoursConfig[dayName];
+    if (!dayHours) return [];
+    
+    const [start, end] = dayHours.split('-');
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    const startTimeTotal = startH * 60 + startM;
+    const endTimeTotal = endH * 60 + endM;
+    
+    const dayReservations = reservations.filter(r => r.roomId === selectedRoom.id && r.date === dateStr && r.status !== 'Cancelled');
+    
+    const segments: { total: number, status: 'Free' | 'Occupied' | 'Pending' | 'Buffer' }[] = [];
+    for (let total = startTimeTotal; total < endTimeTotal; total += 15) {
+      segments.push({ total, status: 'Free' });
+    }
+    
+    // Apply reservations and mark buffers
+    dayReservations.forEach(res => {
+      const resStart = parseInt(res.startTime.split(':')[0]) * 60 + parseInt(res.startTime.split(':')[1]);
+      let resDur = 0;
+      if (res.duration.includes('Hora')) {
+        resDur = parseInt(res.duration.split(' ')[0]) * 60;
+        if (res.duration.includes('e')) resDur += parseInt(res.duration.split('e ')[1]);
+      } else {
+        resDur = parseInt(res.duration.split(' ')[0]);
+      }
+      const resEnd = resStart + resDur;
+      
+      segments.forEach(s => {
+        if (s.total >= resStart && s.total < resEnd) {
+          s.status = res.status === 'Pending' ? 'Pending' : 'Occupied';
+        }
+      });
+      
+      // Buffer before and after
+      const bufferBefore = resStart - 15;
+      const bufferAfter = resEnd;
+      segments.forEach(s => {
+        if ((s.total === bufferBefore || s.total === bufferAfter) && s.status === 'Free') {
+          s.status = 'Buffer';
+        }
+      });
+    });
+    
+    // Group segments into blocks
+    const blocks: any[] = [];
+    if (segments.length === 0) return [];
+    
+    let currentBlock: any = null;
+    const now = getAppNow();
+    
+    segments.forEach(s => {
+        const slotDate = new Date(`${dateStr}T${Math.floor(s.total/60).toString().padStart(2, '0')}:${(s.total%60).toString().padStart(2, '0')}:00`);
+        const isPast = slotDate < now;
+        const isBeyond = slotDate > maxBookingWindow;
+        
+        let effectiveStatus = s.status;
+        if (isPast || isBeyond) {
+            effectiveStatus = 'Unavailable' as any;
+        }
+
+        if (!currentBlock) {
+            currentBlock = { start: s.total, end: s.total + 15, status: effectiveStatus };
+        } else if (currentBlock.status === effectiveStatus && s.total === currentBlock.end) {
+            currentBlock.end += 15;
+        } else {
+            if (currentBlock.status !== 'Buffer' && currentBlock.status !== 'Unavailable') {
+                blocks.push(currentBlock);
+            }
+            currentBlock = { start: s.total, end: s.total + 15, status: effectiveStatus };
+        }
+    });
+    if (currentBlock && currentBlock.status !== 'Buffer' && currentBlock.status !== 'Unavailable') {
+        blocks.push(currentBlock);
+    }
+    
+    return blocks;
+  };
+
+  const nextThreeDays = useMemo(() => {
+    const days = [];
+    const now = getAppNow();
+    for (let i = 0; i < 3; i++) {
+        const d = new Date(now);
+        d.setHours(0,0,0,0);
+        d.setDate(d.getDate() + i);
+        days.push(d);
+    }
+    return days;
+  }, []);
+
+  if (!selectedRoom) return (
+    <div className="flex-1 flex items-center justify-center p-10 text-slate-500">
+      Room not found
+    </div>
+  );
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="flex-1 overflow-y-auto p-4 md:p-10 bg-slate-50 dark:bg-slate-950"
+    >
+      <div className="max-w-xl mx-auto pb-20 md:pb-0">
+        <div className="flex items-center gap-4 mb-8">
+            <button 
+                onClick={() => setCurrentView('map')}
+                className="p-2 rounded-full hover:bg-white dark:hover:bg-slate-900 transition-colors"
+                title={t.navMap}
+            >
+                <ArrowLeft size={20} className="text-slate-600 dark:text-slate-400" />
+            </button>
+            <div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">{selectedRoom.name}</h2>
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                    <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-900">{selectedRoom.department}</span>
+                    <span>•</span>
+                    <span>{t.building} {selectedRoom.building}</span>
+                </div>
+            </div>
+        </div>
+
+        <div className="space-y-8">
+            {nextThreeDays.map((day, idx) => {
+                const blocks = getDayBlocks(day);
+                if (blocks.length === 0) return null;
+
+                const dayLabel = idx === 0 ? t.today : idx === 1 ? t.tomorrow : day.toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' });
+
+                return (
+                    <div key={idx} className="space-y-3">
+                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 pl-1">
+                            {dayLabel}
+                        </h3>
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                            {blocks.map((block, bIdx) => {
+                                const format = (t: number) => {
+                                    const totalMinutes = t % 1440;
+                                    const h = Math.floor(totalMinutes / 60);
+                                    const m = totalMinutes % 60;
+                                    // Special case: if it started as 1440, it should be "00:00" of next day
+                                    // but if it's exactly 1440 we can just show 00:00
+                                    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                                };
+                                const startTime = format(block.start);
+                                
+                                // Extend the last "Free" block's end time by the max booking duration (e.g., 4h)
+                                // to show the full potential coverage as requested by the user.
+                                let displayEnd = block.end;
+                                if (block.status === 'Free' && bIdx === blocks.length - 1) {
+                                    displayEnd += MAX_BOOKING_DURATION_MINS;
+                                }
+                                
+                                    const endTime = format(displayEnd);
+                                const isSelected = bookingDate === getAppDate(day) && bookingStartTime === startTime;
+                                
+                                return (
+                                    <div 
+                                        key={bIdx} 
+                                        className={`flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 last:border-0 ${
+                                            block.status === 'Free' ? 'cursor-pointer' : ''
+                                        } ${isSelected ? 'bg-blue-50/30 dark:bg-blue-900/10' : ''}`}
+                                        onClick={() => {
+                                            if (block.status === 'Free') {
+                                                setBookingDate(getAppDate(day));
+                                                setBookingStartTime(startTime);
+                                                setBookingDuration('1 Hora');
+                                                onNewBooking();
+                                            }
+                                        }}
+                                    >
+                                        <div className="flex flex-col">
+                                            <span className={`text-sm font-bold transition-colors ${
+                                                isSelected ? 'text-[#0066cc]' : 'text-slate-900 dark:text-white'
+                                            }`}>
+                                                {startTime} - {endTime}
+                                            </span>
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                                                block.status === 'Occupied' ? 'text-rose-500' :
+                                                block.status === 'Pending' ? 'text-orange-500' :
+                                                isSelected ? 'text-[#0066cc]' : 'text-emerald-500'
+                                            }`}>
+                                                {block.status === 'Occupied' ? (lang === 'pt' ? 'Reservada' : 'Reserved') :
+                                                 block.status === 'Pending' ? (lang === 'pt' ? 'Pendente' : 'Pending') :
+                                                 (lang === 'pt' ? 'Livre' : 'Free')}
+                                            </span>
+                                        </div>
+                                        
+                                        {!isSelected && (
+                                            <>
+                                                {block.status === 'Free' && (
+                                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
+                                                        <Plus size={18} />
+                                                    </div>
+                                                )}
+                                                {(block.status === 'Occupied' || block.status === 'Pending') && (
+                                                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-300 dark:text-slate-700">
+                                                        <Lock size={16} />
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 const SchedulesView = ({ 
   rooms, 
   reservations,
@@ -2010,7 +2270,7 @@ export default function App() {
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'backoffice' | 'manage-rooms' | 'manage-users'>('map');
+  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'room-details' | 'backoffice' | 'manage-rooms' | 'manage-users'>('map');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [floorPlanMaps, setFloorPlanMaps] = useState<Record<string, string>>({});
   const [selectedRoomId, setSelectedRoomId] = useState<string>(import.meta.env.VITE_DEFAULT_ROOM_ID || '101');
@@ -2064,7 +2324,7 @@ export default function App() {
       if (match) {
         const roomId = match[1];
         setSelectedRoomId(roomId);
-        setCurrentView('schedules');
+        setCurrentView('room-details');
         
         // If rooms are loaded, find matching room to update location state
         if (rooms.length > 0) {
@@ -2090,10 +2350,10 @@ export default function App() {
 
   // Update URL when view changes or room changes
   useEffect(() => {
-    if (currentView === 'schedules' && selectedRoomId) {
+    if ((currentView === 'schedules' || currentView === 'room-details') && selectedRoomId) {
       const newPath = `/sala/${selectedRoomId}`;
       if (window.location.pathname !== newPath) {
-        window.history.pushState({ view: 'schedules', roomId: selectedRoomId }, '', newPath);
+        window.history.pushState({ view: currentView, roomId: selectedRoomId }, '', newPath);
       }
     } else if (currentView === 'map') {
       if (window.location.pathname !== '/' && window.location.pathname !== '') {
@@ -3167,6 +3427,26 @@ export default function App() {
                 maxBookingWindow={maxBookingWindow}
                 lang={lang}
               />
+            ) : currentView === 'room-details' ? (
+              <RoomDetailsView 
+                rooms={rooms}
+                reservations={reservations}
+                selectedRoomId={selectedRoomId}
+                setSelectedRoomId={setSelectedRoomId}
+                bookingDate={bookingDate}
+                bookingStartTime={bookingStartTime}
+                setBookingDate={setBookingDate}
+                setBookingStartTime={setBookingStartTime}
+                setBookingDuration={setBookingDuration}
+                onNewBooking={() => {
+                  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+                    setMobileShowDetails(true);
+                  }
+                }}
+                maxBookingWindow={maxBookingWindow}
+                lang={lang}
+                setCurrentView={setCurrentView}
+              />
             ) : currentView === 'reservations' ? (
               <motion.div 
                 key="reservations-view"
@@ -3301,7 +3581,7 @@ export default function App() {
         </main>
 
         {/* Room Details Sidebar (Desktop) / Bottom Sheet (Mobile) */}
-        {(currentView === 'map' || currentView === 'schedules') && selectedRoom && (
+        {(currentView === 'map' || currentView === 'schedules' || currentView === 'room-details') && selectedRoom && (
           <>
             {/* Desktop Sidebar */}
             <aside className="hidden md:flex w-80 flex-col border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto shrink-0 transition-colors">
@@ -3384,7 +3664,7 @@ export default function App() {
                             />
                           </div>
 
-                          {currentView === 'schedules' && (
+                          {(currentView === 'schedules' || currentView === 'room-details') && (
                             <>
                               <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.selectDate}</label>
