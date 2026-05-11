@@ -3828,7 +3828,7 @@ export default function App() {
                           />
                         </div>
 
-                        {currentView === 'schedules' && (
+                        {(currentView === 'schedules' || currentView === 'room-details') && (
                           <div className="grid grid-cols-2 gap-4">
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative overflow-hidden">
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Data</p>

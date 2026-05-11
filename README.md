@@ -444,6 +444,12 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.7.8 (May 11, 2026)
+- **Interactive Selection**: "Livre" (Free) slots in the Room Details list now feature an active selection state (blue highlight) that locks the specific time slot, removing the hover icons for a cleaner, more intuitive booking experience.
+- **Mobile UI Fix**: Resolved a critical issue in the mobile interface where the start time selection was missing in the booking bottom sheet when navigating via deep links.
+- **Visual Refinements**: Updated status color coding (Orange for "Pendente") and verified terminology ("Reservada") to match the official library system's visual identity.
+- **Optimized Coverage**: The availability list now displays "Livre" blocks extending up to 4 hours beyond the last possible starting slot, accurately representing the room's maximum occupancy potential.
+
 ### Version 0.7.7 (May 8, 2026)
 - **Room Details View**: Introduced a new specialized view for direct room access via deep links.
 - **Availability List**: Deep links (`/sala/{roomId}`) now navigate to a dedicated list view showing available time slots for the next 2-3 days.
@@ -570,7 +576,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** May 08, 2026
+**Last Updated:** May 11, 2026
 ```
 
 This README provides:
