@@ -447,6 +447,7 @@ For support, please contact:
 ### Version 0.7.8 (May 11, 2026)
 - **Interactive Selection**: "Livre" (Free) slots in the Room Details list now feature an active selection state (blue highlight) that locks the specific time slot, removing the hover icons for a cleaner, more intuitive booking experience.
 - **Mobile UI Fix**: Resolved a critical issue in the mobile interface where the start time selection was missing in the booking bottom sheet when navigating via deep links.
+- **Calendar Visibility**: Adjusted the "Schedules" grid to accurately reflect the desired operating window: now starting at 09:00 and extending until 00:00 (midnight), ensuring all late-night reservation possibilities are visible.
 - **Visual Refinements**: Updated status color coding (Orange for "Pendente") and verified terminology ("Reservada") to match the official library system's visual identity.
 - **Optimized Coverage**: The availability list now displays "Livre" blocks extending up to 4 hours beyond the last possible starting slot, accurately representing the room's maximum occupancy potential.
 

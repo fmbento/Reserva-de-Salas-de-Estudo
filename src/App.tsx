@@ -1811,7 +1811,7 @@ const SchedulesView = ({
   }, [selectedRoomId, currentDate]);
 
   const days = lang === 'pt' ? ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'] : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-  const hours = Array.from({ length: 11 }, (_, i) => `${(i + 8).toString().padStart(2, '0')}:00`);
+  const hours = Array.from({ length: 15 }, (_, i) => `${(i + 9).toString().padStart(2, '0')}:00`);
 
   const filteredRooms = rooms.filter(r => 
     r.name.toLowerCase().includes(roomSearch.toLowerCase()) || 
@@ -3327,8 +3327,8 @@ export default function App() {
                         onChange={(e) => setBookingStartTime(e.target.value)}
                         className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-slate-300 focus:ring-0 cursor-pointer p-0"
                       >
-                        {Array.from({ length: 64 }, (_, i) => {
-                          const h = Math.floor(i / 4) + 8;
+                        {Array.from({ length: 60 }, (_, i) => {
+                          const h = Math.floor(i / 4) + 9;
                           const m = (i % 4) * 15;
                           if (h >= 24) return null;
                           const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
@@ -3685,8 +3685,8 @@ export default function App() {
                                   onChange={(e) => setBookingStartTime(e.target.value)}
                                   className="w-full rounded-lg border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-[#0066cc] focus:ring-[#0066cc]"
                                 >
-                                  {Array.from({ length: 64 }, (_, i) => {
-                                    const h = Math.floor(i / 4) + 8;
+                                  {Array.from({ length: 60 }, (_, i) => {
+                                    const h = Math.floor(i / 4) + 9;
                                     const m = (i % 4) * 15;
                                     if (h >= 24) return null;
                                     const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
@@ -3855,8 +3855,8 @@ export default function App() {
                                 onChange={(e) => setBookingStartTime(e.target.value)}
                                 className="absolute inset-0 opacity-0 cursor-pointer z-10"
                               >
-                                {Array.from({ length: 64 }, (_, i) => {
-                                  const h = Math.floor(i / 4) + 8;
+                                {Array.from({ length: 60 }, (_, i) => {
+                                  const h = Math.floor(i / 4) + 9;
                                   const m = (i % 4) * 15;
                                   if (h >= 24) return null;
                                   const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
