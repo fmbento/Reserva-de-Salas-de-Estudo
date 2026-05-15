@@ -21,6 +21,32 @@ The system features:
 - 🐳 Docker support for easy deployment
 
 ---
+## User Interface
+
+### Desktop
+
+<img width="1909" height="942" alt="image" src="https://github.com/user-attachments/assets/8e7a319d-5aed-48f3-937a-6d7877e7da63" />
+
+<img width="1916" height="939" alt="image" src="https://github.com/user-attachments/assets/c1598c21-1bb5-447b-b560-5ccd6fbe3606" />
+
+<img width="1913" height="940" alt="image" src="https://github.com/user-attachments/assets/8130fdcc-0ca8-486c-a173-1a316230f959" />
+
+<img width="1915" height="944" alt="image" src="https://github.com/user-attachments/assets/29c55d32-c951-42c8-97fd-08db0cf94dba" />
+
+<img width="1907" height="920" alt="image" src="https://github.com/user-attachments/assets/49746119-363c-49ac-92e6-e3140dbb9920" />
+
+<img width="1916" height="940" alt="image" src="https://github.com/user-attachments/assets/25c549e3-e7cb-4b7e-b4ea-0adc58d0dfc0" />
+
+<img width="1917" height="620" alt="image" src="https://github.com/user-attachments/assets/907b9435-372b-47db-9f43-d746b674aed7" />
+
+<img width="1898" height="938" alt="image" src="https://github.com/user-attachments/assets/c7e8ec57-4cb3-4b21-bed5-db5b74f38c06" />
+
+### Mobile:
+
+<img width="305" height="519" alt="image" src="https://github.com/user-attachments/assets/c2f99a52-2ab6-4362-8d2b-a872c48edbb6" /> 
+<img width="309" height="503" alt="image" src="https://github.com/user-attachments/assets/23b0ae17-9c55-42b7-8229-899e5d88a82a" /> <img width="308" height="507" alt="image" src="https://github.com/user-attachments/assets/7d2deba6-937f-4548-b689-743205772648" />
+<img width="311" height="524" alt="image" src="https://github.com/user-attachments/assets/13d3b68f-69bf-4b6a-944d-b9d359049611" /><img width="305" height="523" alt="image" src="https://github.com/user-attachments/assets/609a8ca4-7d6e-409d-9f1a-7f8131466aab" /><img width="329" height="588" alt="image" src="https://github.com/user-attachments/assets/e3af41c3-c4fc-404b-864b-757c2a09d745" />
+
 
 ## 🚀 Quick Start
 
