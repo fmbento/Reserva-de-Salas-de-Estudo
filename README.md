@@ -74,7 +74,7 @@ The system features:
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` with your configuration (see [Configuration](#-configuration) section)
+   Edit `.env` with your configuration (see [Configuration](#%EF%B8%8F-configuration) section)
 
 4. **Run the application:**
 
