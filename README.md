@@ -484,6 +484,11 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.7.9 (June 2, 2026)
+- **Database Row Level Security (RLS)**: Enabled Row Level Security on all tables (`users`, `rooms`, `reservations`, `otps`) to eliminate security vulnerabilities and protect database integrity.
+- **Enhanced Security Compliance**: Implemented robust user-access policies matching strict column checking to clear all Supabase Security Advisor "RLS Policy Always True" warnings.
+- **Isolated OTP Protection**: Secured OTP code verification by adding a strict false-evaluation policy on the `otps` table, guaranteeing that codes can only be queried and manipulated by the backend service.
+
 ### Version 0.7.8 (May 11, 2026)
 - **Interactive Selection**: "Livre" (Free) slots in the Room Details list now feature an active selection state (blue highlight) that locks the specific time slot, removing the hover icons for a cleaner, more intuitive booking experience.
 - **Mobile UI Fix**: Resolved a critical issue in the mobile interface where the start time selection was missing in the booking bottom sheet when navigating via deep links.
@@ -617,7 +622,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** May 11, 2026
+**Last Updated:** June 02, 2026
 ```
 
 This README provides:
