@@ -74,7 +74,7 @@ The system features:
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` with your configuration (see [Configuration](#%EF%B8%8F-configuration) section)
+   Edit `.env` with your configuration (see [Configuration](#-configuration) section)
 
 4. **Run the application:**
 
@@ -278,6 +278,20 @@ npm run preview
 ## 💾 Database
 
 The application uses **Supabase** for data persistence and real-time features. The database schema is managed in Supabase.
+
+### 🔐 Row Level Security (RLS) & Security Compliance
+
+If you receive security warnings in your Supabase Dashboard such as `"Table public.users is public, but RLS has not been enabled"`, you can resolve them and secure your database instantly by running our optimized SQL setup script.
+
+To enable RLS and set up safe policies without breaking the app:
+1. Open the **SQL Editor** in your Supabase Dashboard.
+2. Create a **New Query**.
+3. Copy and run the queries defined in the **[`supabase_setup.sql`](./supabase_setup.sql)** file at the root of this project.
+
+This script will:
+- **Enable Row Level Security (RLS)** on all tables (`users`, `rooms`, `reservations`, `otps`).
+- **Create Secure Public Access Policies** so anonymous web clients can perform appropriate read/write operations for room viewing and booking requests.
+- **Protect OTP Security**: Isolation is set on `public.otps` without public policies. This ensures OTPs can strictly be created, managed, and verified by your backend server (`SUPABASE_SERVICE_ROLE_KEY`), completely securing OTP code authentication from snooping on the client side.
 
 ### Database Tables
 
