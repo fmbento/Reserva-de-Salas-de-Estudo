@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   User, 
   LogOut, 
@@ -10,7 +10,10 @@ import {
   Info,
   ShieldCheck,
   Building,
-  Award
+  Award,
+  Bell,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Language, translations } from '../../translations';
@@ -73,6 +76,58 @@ export default function ManagementView({
   onLogout
 }: ManagementViewProps) {
   const t = translations[lang];
+
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [showInAppAlert, setShowInAppAlert] = useState(false);
+  const [inAppAlertMessage, setInAppAlertMessage] = useState('');
+
+  // Read initial notification permission state on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  const requestPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      triggerInAppAlert(lang === 'pt' ? 'Notificações não são suportadas neste navegador.' : 'Notifications are not supported in this browser.');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === 'granted') {
+        const title = lang === 'pt' ? 'Ativado com Sucesso! 🔔' : 'Successfully Activated! 🔔';
+        const body = lang === 'pt' ? 'Agora receberá alertas de confirmação e lembretes de salas!' : 'You will now receive reservation confirmation and room reminders!';
+        new Notification(title, { body, icon: 'https://img.icons8.com/color/96/000000/university.png' });
+      }
+    } catch (err) {
+      triggerInAppAlert(lang === 'pt' ? 'Erro ao solicitar permissão.' : 'Error requesting permission.');
+    }
+  };
+
+  const triggerInAppAlert = (msg: string) => {
+    setInAppAlertMessage(msg);
+    setShowInAppAlert(true);
+    setTimeout(() => {
+      setShowInAppAlert(false);
+    }, 4500);
+  };
+
+  const simulateNotification = () => {
+    const title = lang === 'pt' ? 'Lembrete de Sala UA 📍' : 'UA Room Reminder 📍';
+    const body = lang === 'pt' ? 'A sua reserva da Sala 204 no Bloco Trás inicia em 15 minutos.' : 'Your reservation for Room 204 in the Back Block starts in 15 minutes.';
+
+    if (notificationPermission === 'granted') {
+      new Notification(title, { 
+        body, 
+        icon: 'https://img.icons8.com/color/96/000000/university.png'
+      });
+    } else {
+      triggerInAppAlert(`[Android Push Preview] \n${title}\n${body}`);
+    }
+  };
 
   // User details
   const nameInitials = useMemo(() => {
@@ -147,6 +202,56 @@ export default function ManagementView({
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80 android-shadow-1 flex flex-col items-center">
             <span className="text-2xl font-black text-amber-500">{stats.hours}h</span>
             <span className="text-[10px] uppercase font-extrabold text-slate-400 dark:text-slate-500 mt-1 text-center font-sans">Reservadas</span>
+          </div>
+        </div>
+
+        {/* Push Notification Integration Service Card */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/80 android-shadow-1 p-5 transition-colors">
+          <div className="flex items-center gap-2 mb-3">
+            <Bell size={18} className="text-[#0066cc]" />
+            <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              {lang === 'pt' ? 'Sistema de Notificações' : 'Notification Control'}
+            </h4>
+          </div>
+
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
+            {lang === 'pt' 
+              ? 'Receba alertas push em tempo real antes das suas reservas e avisos de check-in pendente.' 
+              : 'Receive real-time push alerts before your reservations and pending check-in notices.'}
+          </p>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-800/50">
+              <div>
+                <span className="text-xs font-bold block text-slate-700 dark:text-slate-300">
+                  {lang === 'pt' ? 'Estado das Permissões' : 'Permission Status'}
+                </span>
+                <span className="text-[10px] uppercase font-mono tracking-widest text-[#0066cc] dark:text-blue-400 font-extrabold mt-0.5 block">
+                  {notificationPermission === 'granted' ? (lang === 'pt' ? 'ATIVADO' : 'GRANTED') : (lang === 'pt' ? 'NÃO PERMITIDO' : 'NOT GRANTED')}
+                </span>
+              </div>
+
+              {notificationPermission !== 'granted' ? (
+                <button 
+                  onClick={requestPermission}
+                  className="px-4 h-9 rounded-xl bg-[#0066cc] text-white hover:bg-blue-700 text-xs font-bold transition-all"
+                >
+                  {lang === 'pt' ? 'Ativar' : 'Activate'}
+                </button>
+              ) : (
+                <span className="text-emerald-500 flex items-center gap-1 text-xs font-semibold">
+                  <CheckCircle size={14} /> {lang === 'pt' ? 'Ativo' : 'Active'}
+                </span>
+              )}
+            </div>
+
+            <button 
+              onClick={simulateNotification}
+              className="w-full h-10 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-2"
+            >
+              <Bell size={14} />
+              {lang === 'pt' ? 'Simular Alerta de Sala' : 'Simulate Room Alert'}
+            </button>
           </div>
         </div>
 
@@ -234,6 +339,22 @@ export default function ManagementView({
         </div>
 
       </div>
+
+      {/* Elegant Native Look In-App alert component */}
+      {showInAppAlert && (
+        <motion.div 
+          initial={{ opacity: 0, y: 50, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.95 }}
+          className="fixed bottom-24 left-4 right-4 bg-slate-900 dark:bg-slate-800 text-white rounded-2xl p-4 shadow-2xl z-[100] border border-slate-800 flex items-start gap-3"
+        >
+          <AlertCircle className="text-amber-400 shrink-0 mt-0.5" size={18} />
+          <div className="flex-1">
+            <p className="text-xs font-semibold whitespace-pre-line leading-relaxed">{inAppAlertMessage}</p>
+          </div>
+        </motion.div>
+      )}
+
     </motion.div>
   );
 }
