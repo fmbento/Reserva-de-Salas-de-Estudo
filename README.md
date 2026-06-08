@@ -484,6 +484,12 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.8.1 (June 8, 2026)
+- **Advanced Dynamic Map Zoom & Pan**: Enabled high-precision multi-touch pinch-to-zoom and drag-to-pan gestures on mobile and Android screens, allowing granular navigation across campus floor maps.
+- **Dynamic Marker Scaling**: Implemented smart bubble-size adjustment that contracts room markers as you zoom in closer, ensuring rooms stay perfectly spaced and text remains readable without overlaps.
+- **Compass Reset Button**: Introduced a tactile quick-reset action button to recalibrate scale and offset back to default status.
+- **Schedules Panel Optimization**: Streamlined bottom bar navigation in Standalone/Android Mode by removing the calendar Schedules ("Horários") section, maximizing accessible spacing and simplifying the student-focused booking flow on narrow displays.
+
 ### Version 0.8.0 (June 8, 2026)
 - **Standalone Android App Mode**: Implemented intelligent detection logic (`display-mode: standalone` / `?utm_source=android`) to serve a streamlined, highly optimized student experience.
 - **Dynamic Role-Based Access Control**: Automatically locks out all administrator, librarian, and backoffice panels when operating in Standalone/Android Mode, keeping the focus entirely on studying and room booking.
