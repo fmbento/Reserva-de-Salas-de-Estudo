@@ -2300,7 +2300,7 @@ export default function App() {
 
   // Enforce Student-Only rules under Android Standalone viewports
   useEffect(() => {
-    if (isAndroidApp && (currentView === 'backoffice' || currentView === 'manage-rooms' || currentView === 'manage-users')) {
+    if (isAndroidApp && (currentView === 'backoffice' || currentView === 'manage-rooms' || currentView === 'manage-users' || currentView === 'schedules')) {
       setCurrentView('map');
     }
   }, [isAndroidApp, currentView]);
@@ -2340,14 +2340,80 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [mapScale, setMapScale] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768 ? 0.6 : 1);
+  const [mapPanX, setMapPanX] = useState(0);
+  const [mapPanY, setMapPanY] = useState(0);
   const [mobileShowDetails, setMobileShowDetails] = useState(false);
-  
+
+  // References to track touch start distances and points for pinch-to-zoom & panning
+  const touchState = useRef({
+    startDistance: 0,
+    startScale: 1,
+    startPanX: 0,
+    startPanY: 0,
+    startX: 0,
+    startY: 0,
+    isPinching: false,
+    isPanning: false
+  });
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      touchState.current.startDistance = dist;
+      touchState.current.startScale = mapScale;
+      touchState.current.isPinching = true;
+      touchState.current.isPanning = false;
+    } else if (e.touches.length === 1) {
+      const t = e.touches[0];
+      touchState.current.startX = t.clientX;
+      touchState.current.startY = t.clientY;
+      touchState.current.startPanX = mapPanX;
+      touchState.current.startPanY = mapPanY;
+      touchState.current.isPanning = true;
+      touchState.current.isPinching = false;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && touchState.current.isPinching) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      if (touchState.current.startDistance > 0) {
+        const ratio = dist / touchState.current.startDistance;
+        // Allows zoom-in up to 4.5x scale to prevent overlaps
+        const newScale = Math.max(0.4, Math.min(touchState.current.startScale * ratio, 4.5));
+        setMapScale(newScale);
+      }
+    } else if (e.touches.length === 1 && touchState.current.isPanning) {
+      const t = e.touches[0];
+      const deltaX = t.clientX - touchState.current.startX;
+      const deltaY = t.clientY - touchState.current.startY;
+      setMapPanX(touchState.current.startPanX + deltaX);
+      setMapPanY(touchState.current.startPanY + deltaY);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchState.current.isPinching = false;
+    touchState.current.isPanning = false;
+  };
+
   const [bookingStatus, setBookingStatus] = useState<'idle' | 'checking' | 'success' | 'error'>('idle');
   const [bookingMessage, setBookingMessage] = useState<string>('');
   
   const [selectedBuilding, setSelectedBuilding] = useState(import.meta.env.VITE_DEFAULT_BUILDING || '17');
   const [selectedFloor, setSelectedFloor] = useState(import.meta.env.VITE_DEFAULT_FLOOR || '2');
   const [selectedSection, setSelectedSection] = useState(import.meta.env.VITE_DEFAULT_SECTION || 'Trás');
+
+  // Reset panning and zoom whenever room location updates to prevent map getting lost
+  useEffect(() => {
+    setMapPanX(0);
+    setMapPanY(0);
+    setMapScale(typeof window !== 'undefined' && window.innerWidth < 768 ? 0.6 : 1);
+  }, [selectedBuilding, selectedFloor, selectedSection]);
 
   // Deep Linking logic
   useEffect(() => {
@@ -3375,12 +3441,17 @@ export default function App() {
 
                 {/* Map Container */}
                 <div className="relative flex-1 flex flex-col overflow-hidden">
-                  <div className="absolute inset-0 flex items-center justify-center p-1 md:p-4 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors overflow-hidden">
+                  <div 
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    className="absolute inset-0 flex items-center justify-center p-1 md:p-4 bg-[#94b395] dark:bg-[#2d3a2d] cursor-default transition-colors overflow-hidden touch-none"
+                  >
                     <div 
                       className="relative flex items-center justify-center max-w-full max-h-full"
                       style={{ 
-                        transform: `scale(${mapScale})`,
-                        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        transform: `translate(${mapPanX}px, ${mapPanY}px) scale(${mapScale})`,
+                        transition: (touchState.current.isPanning || touchState.current.isPinching) ? 'none' : 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
                     >
                       <div className="relative inline-block max-w-full max-h-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/20 dark:bg-white/5 shadow-2xl overflow-hidden">
@@ -3391,7 +3462,7 @@ export default function App() {
                         <img 
                           src={getFloorPlanImage(selectedBuilding, selectedFloor, selectedSection)} 
                           alt={`Floor Plan ${selectedBuilding}.${selectedFloor} ${selectedSection}`} 
-                          className="max-w-full max-h-full object-contain opacity-80 dark:opacity-60 transition-opacity duration-500 block"
+                          className="max-w-full max-h-full object-contain opacity-80 dark:opacity-60 transition-opacity duration-500 block select-none pointer-events-none"
                           style={{ maxHeight: 'calc(100vh - 200px)' }}
                           referrerPolicy="no-referrer"
                         />
@@ -3413,6 +3484,8 @@ export default function App() {
                               }}
                               statusColor={statusColor}
                               status={dynamicStatus}
+                              mapScale={mapScale}
+                              isAndroidApp={isAndroidApp}
                             />
                           );
                         })}
@@ -3422,7 +3495,7 @@ export default function App() {
                   </div>
 
                   {/* Legend below map */}
-                  <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-4 py-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-10">
+                  <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-4 py-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 z-10 select-none">
                     <LegendItem color="bg-emerald-500" label={t.statusAvailable.toUpperCase()} />
                     <LegendItem color="bg-amber-500" label={t.statusPending.toUpperCase()} />
                     <LegendItem color="bg-rose-500" label={t.statusOccupied.toUpperCase()} />
@@ -3432,19 +3505,33 @@ export default function App() {
                 {/* Map Controls */}
                 <div className="flex absolute bottom-24 right-4 md:bottom-6 md:right-6 flex-col gap-2 z-10">
                   <button 
-                    onClick={() => setMapScale(prev => Math.min(prev + 0.2, 3))}
-                    className="flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    onClick={() => setMapScale(prev => Math.min(prev + 0.3, 4.5))}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                     title="Aumentar Zoom"
                   >
-                    <Plus size={18} className="md:w-5 md:h-5" />
+                    <Plus size={20} />
                   </button>
                   <button 
-                    onClick={() => setMapScale(prev => Math.max(prev - 0.2, 0.5))}
-                    className="flex h-9 w-9 md:h-10 md:w-10 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    onClick={() => setMapScale(prev => Math.max(prev - 0.3, 0.4))}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                     title="Diminuir Zoom"
                   >
-                    <Minus size={18} className="md:w-5 md:h-5" />
+                    <Minus size={20} />
                   </button>
+                  {/* RotateCcw / Reset Panning control */}
+                  {(mapScale !== (typeof window !== 'undefined' && window.innerWidth < 768 ? 0.6 : 1) || mapPanX !== 0 || mapPanY !== 0) && (
+                    <button 
+                      onClick={() => {
+                        setMapScale(typeof window !== 'undefined' && window.innerWidth < 768 ? 0.6 : 1);
+                        setMapPanX(0);
+                        setMapPanY(0);
+                      }}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 shadow-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                      title={lang === 'pt' ? "Repor posição" : "Reset offset"}
+                    >
+                      <RotateCcw size={18} />
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ) : currentView === 'schedules' ? (
@@ -4005,24 +4092,26 @@ export default function App() {
           </button>
 
           {/* Hub 2: Schedules */}
-          <button 
-            onClick={() => {
-              setCurrentView('schedules');
-              setMobileShowDetails(false);
-            }}
-            className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
-              currentView === 'schedules' ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500'
-            }`}
-            style={{ minWidth: '48px', minHeight: '48px' }}
-          >
-            <div className="relative">
-              <Clock size={22} className={`transition-transform duration-200 ${currentView === 'schedules' ? 'scale-110' : ''}`} />
-              {currentView === 'schedules' && (
-                <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-primary" />
-              )}
-            </div>
-            <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Horários' : 'Schedules'}</span>
-          </button>
+          {!isAndroidApp && (
+            <button 
+              onClick={() => {
+                setCurrentView('schedules');
+                setMobileShowDetails(false);
+              }}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
+                currentView === 'schedules' ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500'
+              }`}
+              style={{ minWidth: '48px', minHeight: '48px' }}
+            >
+              <div className="relative">
+                <Clock size={22} className={`transition-transform duration-200 ${currentView === 'schedules' ? 'scale-110' : ''}`} />
+                {currentView === 'schedules' && (
+                  <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-primary" />
+                )}
+              </div>
+              <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Horários' : 'Schedules'}</span>
+            </button>
+          )}
 
           {/* Hub 3: Reservations */}
           <button 
@@ -4253,19 +4342,42 @@ interface RoomMarkerProps {
   onClick: () => void;
   statusColor: string;
   status: RoomStatus;
+  mapScale?: number;
+  isAndroidApp?: boolean;
 }
 
-function RoomMarker({ room, isSelected, onClick, statusColor, status }: RoomMarkerProps) {
+function RoomMarker({ room, isSelected, onClick, statusColor, status, mapScale = 1, isAndroidApp }: RoomMarkerProps) {
+  const scaleAdjust = useMemo(() => {
+    // Shrink bubble size slightly as the user zooms in, so that zoomed-in maps space rooms out beautifully while bubbles remain independent and never overlap!
+    return Math.max(0.55, 1 / Math.sqrt(mapScale));
+  }, [mapScale]);
+
   return (
     <button 
       onClick={onClick}
-      className="absolute group z-20 -translate-x-1/2 -translate-y-1/2"
-      style={{ top: room.top, left: room.left }}
+      className="absolute group z-20 -translate-x-1/2 -translate-y-1/2 select-none"
+      style={{ 
+        top: room.top, 
+        left: room.left,
+        minWidth: isAndroidApp ? '48px' : 'auto',
+        minHeight: isAndroidApp ? '48px' : 'auto',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        touchAction: 'none'
+      }}
     >
-      <div className="flex flex-col items-center">
+      <div className="flex flex-col items-center justify-center p-2">
         <motion.div 
-          animate={{ scale: isSelected ? 1.1 : 1 }}
-          className={`px-3 py-1 text-white text-[10px] font-bold rounded-full shadow-lg border-2 ${isSelected ? 'border-rose-600' : 'border-white'} ${statusColor}`}
+          animate={{ scale: isSelected ? scaleAdjust * 1.15 : scaleAdjust }}
+          transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+          className={`px-3 py-1 text-white text-[10px] font-bold rounded-full shadow-lg border-2 ${
+            isSelected ? 'border-rose-600 bg-rose-500 ring-4 ring-rose-500/10' : 'border-white dark:border-slate-800'
+          } ${statusColor}`}
+          style={{
+            fontSize: isAndroidApp ? '11px' : '10px',
+            transformOrigin: 'center center'
+          }}
         >
           {room.name}
         </motion.div>
