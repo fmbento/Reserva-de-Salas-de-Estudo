@@ -41,7 +41,8 @@ import {
   Globe,
   ShieldCheck,
   UserX,
-  ArrowLeft
+  ArrowLeft,
+  QrCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cookies from 'js-cookie';
@@ -2339,6 +2340,7 @@ export default function App() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const [mapScale, setMapScale] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768 ? 0.6 : 1);
   const [mapPanX, setMapPanX] = useState(0);
   const [mapPanY, setMapPanY] = useState(0);
@@ -2414,6 +2416,53 @@ export default function App() {
     setMapPanY(0);
     setMapScale(typeof window !== 'undefined' && window.innerWidth < 768 ? 0.6 : 1);
   }, [selectedBuilding, selectedFloor, selectedSection]);
+
+  // Web-side handler for scanned QR codes (callback for AndroidCompanion or local simulation)
+  useEffect(() => {
+    (window as any).handleScannedQR = (qrContent: string) => {
+      if (!qrContent) return;
+      
+      let parsedRoomId = qrContent.trim();
+      
+      // If parsedRoomId has a query string like "?utm_source=android", strip it before resolving
+      if (parsedRoomId.includes('?')) {
+        parsedRoomId = parsedRoomId.split('?')[0];
+      }
+      
+      // If it contains a full URL, e.g., "https://reserva-de-salas-de-estudo.vercel.app/sala/17.3.18"
+      if (parsedRoomId.includes('/sala/')) {
+        const parts = parsedRoomId.split('/sala/');
+        parsedRoomId = parts[parts.length - 1];
+      } else if (parsedRoomId.includes('/')) {
+        const parts = parsedRoomId.split('/');
+        parsedRoomId = parts[parts.length - 1];
+      }
+      
+      // Look up and select this room
+      const foundRoom = rooms.find(r => r.id === parsedRoomId || r.name === parsedRoomId);
+      if (foundRoom) {
+        setSelectedRoomId(foundRoom.id);
+        setSelectedBuilding(foundRoom.building);
+        setSelectedFloor(foundRoom.floor);
+        setSelectedSection(foundRoom.section);
+        setCurrentView('room-details'); 
+        setShowQRScanner(false);
+        
+        // Show success toast
+        setBookingStatus('success');
+        setBookingMessage(lang === 'pt' ? `Sala ${foundRoom.name} aberta com QR Code! 📱` : `Room ${foundRoom.name} opened with QR Code! 📱`);
+        setTimeout(() => setBookingStatus('idle'), 4000);
+      } else {
+        setBookingStatus('error');
+        setBookingMessage(lang === 'pt' ? `Sala não encontrada para o código: ${parsedRoomId}` : `Room not found for code: ${parsedRoomId}`);
+        setTimeout(() => setBookingStatus('idle'), 4000);
+      }
+    };
+
+    return () => {
+      delete (window as any).handleScannedQR;
+    };
+  }, [rooms, lang]);
 
   // Deep Linking logic
   useEffect(() => {
@@ -4113,6 +4162,34 @@ export default function App() {
             </button>
           )}
 
+          {/* Hub 2.5: QR Detector (Optimized for Android Companion / Mobile Browsers) */}
+          <button 
+            onClick={() => {
+              // Trigger bridge scan if available in android companion mode
+              if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.startQRScanner) {
+                try {
+                  (window as any).AndroidBridge.startQRScanner();
+                } catch (err) {
+                  console.error("Failed to call AndroidBridge", err);
+                }
+              }
+              // Always open the scanner overlay inside web for instructions & simulation feedback
+              setShowQRScanner(true);
+            }}
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
+              showQRScanner ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-blue-400'
+            }`}
+            style={{ minWidth: '48px', minHeight: '48px' }}
+          >
+            <div className="relative">
+              <QrCode size={22} className={`transition-transform duration-200 ${showQRScanner ? 'scale-110 text-emerald-500' : ''}`} />
+              {showQRScanner && (
+                <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              )}
+            </div>
+            <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Ler QR' : 'Scan QR'}</span>
+          </button>
+
           {/* Hub 3: Reservations */}
           <button 
             onClick={() => {
@@ -4292,6 +4369,120 @@ export default function App() {
                   >
                     {t.delete}
                   </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* QR Scanner Simulation & Native Bridge Overlay */}
+        <AnimatePresence>
+          {showQRScanner && (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowQRScanner(false)}
+                className="absolute inset-0 bg-slate-950/80 backdrop-blur-md cursor-pointer"
+              />
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 30 }}
+                className="relative w-full max-w-sm bg-slate-900 border border-slate-800 text-white rounded-3xl shadow-2xl overflow-hidden"
+              >
+                {/* Visual Scanner Area */}
+                <div className="relative h-44 bg-slate-950 flex items-center justify-center overflow-hidden border-b border-slate-800">
+                  {/* Neon laser line animation */}
+                  <div className="absolute top-0 bottom-0 left-0 right-0 pointer-events-none z-10">
+                    <motion.div 
+                      animate={{ y: [0, 175, 0] }}
+                      transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
+                      className="h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_#34d399] w-full"
+                    />
+                  </div>
+
+                  {/* Finder Brackets */}
+                  <div className="relative h-28 w-28 border-2 border-transparent flex items-center justify-center">
+                    {/* Corner bits */}
+                    <div className="absolute top-0 left-0 w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl-md" />
+                    <div className="absolute top-0 right-0 w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr-md" />
+                    <div className="absolute bottom-0 left-0 w-5 h-5 border-b-4 border-l-4 border-emerald-400 rounded-bl-md" />
+                    <div className="absolute bottom-0 right-0 w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br-md" />
+
+                    <QrCode size={48} className="text-slate-700 animate-pulse" />
+                  </div>
+                </div>
+
+                {/* Content info */}
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-black tracking-wide flex items-center gap-2">
+                      <QrCode size={18} className="text-emerald-400" />
+                      {lang === 'pt' ? 'Leitor de QR Code' : 'QR Code Scanner'}
+                    </h3>
+                    <button 
+                      onClick={() => setShowQRScanner(false)}
+                      className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Integration Status Label */}
+                  <div className="p-3 mb-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">
+                      {lang === 'pt' ? 'Estado' : 'Status'}:
+                    </span>
+                    {typeof window !== 'undefined' && (window as any).AndroidBridge ? (
+                      <span className="text-emerald-400 font-extrabold flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+                        UA COMPANION ACTIVE 📱
+                      </span>
+                    ) : (
+                      <span className="text-blue-400 font-bold flex items-center gap-1.5 uppercase font-mono tracking-widest text-[10px]">
+                        SIMULATION MODE 🌐
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                    {lang === 'pt' 
+                      ? 'Aponte o telemóvel para o QR Code disponível na porta da sala para identificar instantaneamente a ocupação.' 
+                      : 'Point your camera at the QR Code on the study room door to instantly inspect or book it.'}
+                  </p>
+
+                  {/* Manual scanner / selector simulation list */}
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                      {lang === 'pt' ? 'Simular Escaneamento de Sala' : 'Simulate Scanning a Room'}
+                    </label>
+
+                    <div className="max-h-36 overflow-y-auto rounded-xl bg-slate-100 dark:bg-slate-950/60 p-2 divide-y divide-slate-200 dark:divide-slate-800/60 border border-slate-200 dark:border-slate-800/80 scrollbar-thin">
+                      {rooms.length === 0 ? (
+                        <p className="text-[11px] text-slate-500 text-center py-4">
+                          {lang === 'pt' ? 'Sem salas disponíveis.' : 'No rooms available.'}
+                        </p>
+                      ) : (
+                        rooms.map(r => (
+                          <button
+                            key={r.id}
+                            onClick={() => {
+                              const simulatedUrl = `https://reserva-de-salas-de-estudo.vercel.app/sala/${r.id}`;
+                              if ((window as any).handleScannedQR) {
+                                (window as any).handleScannedQR(simulatedUrl);
+                              }
+                            }}
+                            className="w-full text-left py-2 px-3 text-xs flex justify-between items-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800/60 rounded-lg transition-colors"
+                          >
+                            <span className="font-bold">Sala {r.name}</span>
+                            <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 tracking-tight">ID: {r.id}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             </div>
