@@ -46,6 +46,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import Cookies from 'js-cookie';
 import { translations, Language } from '../translations';
+import ManagementView from './components/ManagementView';
 
 type RoomStatus = 'Available' | 'Pending' | 'Occupied';
 type OperationalStatus = 'Active' | 'Maintenance' | 'Inactive';
@@ -2270,7 +2271,39 @@ export default function App() {
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'room-details' | 'backoffice' | 'manage-rooms' | 'manage-users'>('map');
+  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'room-details' | 'backoffice' | 'manage-rooms' | 'manage-users' | 'management'>('map');
+  const [isAndroidApp, setIsAndroidApp] = useState(false);
+
+  // Standalone PWA / Android App Detection & Custom Layout Adapters
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const hasAndroidParam = window.location.search.includes('utm_source=android');
+    const hasViewParam = window.location.search.includes('view=');
+    const storedAndroid = localStorage.getItem('android_app_mode') === 'true';
+    const isAndroid = isStandalone || hasAndroidParam || storedAndroid;
+
+    if (isAndroid) {
+      setIsAndroidApp(true);
+      localStorage.setItem('android_app_mode', 'true');
+      document.documentElement.classList.add('android-mode');
+      
+      // Handle homescreen shortcuts or intent routing via deep links
+      if (hasViewParam) {
+        const queryParams = new URLSearchParams(window.location.search);
+        const view = queryParams.get('view');
+        if (view === 'map' || view === 'reservations' || view === 'schedules' || view === 'management') {
+          setCurrentView(view as any);
+        }
+      }
+    }
+  }, []);
+
+  // Enforce Student-Only rules under Android Standalone viewports
+  useEffect(() => {
+    if (isAndroidApp && (currentView === 'backoffice' || currentView === 'manage-rooms' || currentView === 'manage-users')) {
+      setCurrentView('map');
+    }
+  }, [isAndroidApp, currentView]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [floorPlanMaps, setFloorPlanMaps] = useState<Record<string, string>>({});
   const [selectedRoomId, setSelectedRoomId] = useState<string>(import.meta.env.VITE_DEFAULT_ROOM_ID || '101');
@@ -3063,7 +3096,7 @@ export default function App() {
             >
               {t.navSchedules}
             </button>
-            {(currentUser?.role === 'admin' || currentUser?.role === 'bibliotecário') && (
+            {(currentUser?.role === 'admin' || currentUser?.role === 'bibliotecário') && !isAndroidApp && (
               <button 
                 onClick={() => setCurrentView('backoffice')}
                 className={`text-sm font-semibold transition-colors ${currentView === 'backoffice' ? 'text-[#0066cc]' : 'text-slate-600 dark:text-slate-400 hover:text-[#0066cc]'}`}
@@ -3242,7 +3275,7 @@ export default function App() {
                 active={currentView === 'reservations'} 
                 onClick={() => setCurrentView('reservations')}
               />
-              {(currentUser?.role === 'bibliotecário' || currentUser?.role === 'admin') && (
+              {(currentUser?.role === 'bibliotecário' || currentUser?.role === 'admin') && !isAndroidApp && (
                 <SidebarLink 
                   icon={<CheckCircle2 size={20} />} 
                   label={t.navBackoffice} 
@@ -3567,6 +3600,16 @@ export default function App() {
               <ManageUsersView 
                 lang={lang} 
                 onBack={() => setCurrentView('backoffice')}
+              />
+            ) : currentView === 'management' ? (
+              <ManagementView
+                currentUser={currentUser}
+                reservations={reservations}
+                lang={lang}
+                setLang={setLang}
+                theme={theme}
+                toggleTheme={toggleTheme}
+                onLogout={handleLogout}
               />
             ) : (
               <ManageRoomsView 
@@ -3935,33 +3978,90 @@ export default function App() {
           </>
         )}
 
-        {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-slate-100 flex items-center justify-around px-4 z-[60]">
+        {/* Mobile / Android Bottom Navigation */}
+        <nav 
+          id="android-bottom-tabs"
+          className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white dark:bg-[#080808] border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-around px-4 pb-safe pt-1 z-[60] android-shadow-3 transition-colors select-none"
+          style={{ WebkitUserSelect: 'none' }}
+        >
+          {/* Hub 1: Map */}
           <button 
             onClick={() => {
               setCurrentView('map');
               setMobileShowDetails(false);
             }}
-            className={`flex flex-col items-center gap-1 ${currentView === 'map' ? 'text-primary' : 'text-slate-400'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
+              currentView === 'map' ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500'
+            }`}
+            style={{ minWidth: '48px', minHeight: '48px' }}
           >
-            <MapIcon size={24} />
-            <span className="text-[10px] font-bold">Mapa</span>
+            <div className="relative">
+              <MapIcon size={22} className={`transition-transform duration-200 ${currentView === 'map' ? 'scale-110' : ''}`} />
+              {currentView === 'map' && (
+                <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
+            </div>
+            <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Mapa' : 'Map'}</span>
           </button>
+
+          {/* Hub 2: Schedules */}
+          <button 
+            onClick={() => {
+              setCurrentView('schedules');
+              setMobileShowDetails(false);
+            }}
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
+              currentView === 'schedules' ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500'
+            }`}
+            style={{ minWidth: '48px', minHeight: '48px' }}
+          >
+            <div className="relative">
+              <Clock size={22} className={`transition-transform duration-200 ${currentView === 'schedules' ? 'scale-110' : ''}`} />
+              {currentView === 'schedules' && (
+                <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
+            </div>
+            <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Horários' : 'Schedules'}</span>
+          </button>
+
+          {/* Hub 3: Reservations */}
           <button 
             onClick={() => {
               setCurrentView('reservations');
               setMobileShowDetails(false);
             }}
-            className={`flex flex-col items-center gap-1 ${currentView === 'reservations' ? 'text-primary' : 'text-slate-400'}`}
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
+              currentView === 'reservations' ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500'
+            }`}
+            style={{ minWidth: '48px', minHeight: '48px' }}
           >
-            <Library size={24} />
-            <span className="text-[10px] font-bold">Reservas</span>
+            <div className="relative">
+              <CalendarCheck size={22} className={`transition-transform duration-200 ${currentView === 'reservations' ? 'scale-110' : ''}`} />
+              {currentView === 'reservations' && (
+                <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
+            </div>
+            <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Reservas' : 'Reservations'}</span>
           </button>
+
+          {/* Hub 4: Management */}
           <button 
-            className={`flex flex-col items-center gap-1 text-slate-400`}
+            onClick={() => {
+              setCurrentView('management');
+              setMobileShowDetails(false);
+            }}
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
+              currentView === 'management' ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500'
+            }`}
+            style={{ minWidth: '48px', minHeight: '48px' }}
           >
-            <Settings size={24} />
-            <span className="text-[10px] font-bold">{t.settings}</span>
+            <div className="relative">
+              <User size={22} className={`transition-transform duration-200 ${currentView === 'management' ? 'scale-110' : ''}`} />
+              {currentView === 'management' && (
+                <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
+            </div>
+            <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Gestão' : 'Management'}</span>
           </button>
         </nav>
 

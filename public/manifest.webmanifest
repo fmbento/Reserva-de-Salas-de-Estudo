@@ -1,0 +1,62 @@
+{
+  "name": "SiReS - Reserva de Salas das Bibliotecas UA",
+  "short_name": "SiReS UA",
+  "description": "Reserva de Salas das Bibliotecas da Universidade de Aveiro",
+  "start_url": "/?utm_source=android",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0066cc",
+  "id": "/?utm_source=android",
+  "dir": "ltr",
+  "lang": "pt-PT",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/color/192/000000/university.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://img.icons8.com/color/192/000000/university.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://img.icons8.com/color/512/000000/university.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://img.icons8.com/color/512/000000/university.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mapa de Salas",
+      "short_name": "Mapa",
+      "description": "Ver mapa de salas disponíveis",
+      "url": "/?utm_source=android&view=map",
+      "icons": [{ "src": "https://img.icons8.com/color/96/000000/map.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Horários",
+      "short_name": "Horários",
+      "description": "Consultar horários de ocupação",
+      "url": "/?utm_source=android&view=schedules",
+      "icons": [{ "src": "https://img.icons8.com/color/96/000000/calendar-external-link.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "As Minhas Reservas",
+      "short_name": "Reservas",
+      "description": "Gerir reservas ativas",
+      "url": "/?utm_source=android&view=reservations",
+      "icons": [{ "src": "https://img.icons8.com/color/96/000000/clock.png", "sizes": "96x96" }]
+    }
+  ]
+}

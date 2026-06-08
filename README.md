@@ -484,6 +484,15 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.8.0 (June 8, 2026)
+- **Standalone Android App Mode**: Implemented intelligent detection logic (`display-mode: standalone` / `?utm_source=android`) to serve a streamlined, highly optimized student experience.
+- **Dynamic Role-Based Access Control**: Automatically locks out all administrator, librarian, and backoffice panels when operating in Standalone/Android Mode, keeping the focus entirely on studying and room booking.
+- **Safe Area & Depth Management**: Introduced modern `viewport-fit=cover` safe-area styles (`pt-safe` / `pb-safe`) ensuring full-edge-to-edge layout, complemented by native Material-like shadow elevations (`android-shadow-x`).
+- **Tactile Bottom Navigation**: Added an ultra-smooth, responsive bottom nav bar representing four dynamic hubs (**Map**, **Schedules**, **Reservations**, and **Management**) with fluid spring motions and active state dot guides.
+- **OLED-Optimized Dark Mode**: Integrated deep pure black theme overrides (`#000000`) for enhanced display contrast and unmatched battery savings on modern AMOLED smartphone displays.
+- **App Mimicry & Gesture Locking**: Fully disabled accidental "pull-to-refresh" gestures via strict viewport overscroll rules, locked unintentional text selection, and enlarged high-contrast interactive live map pointers.
+- **Complete Native Manifest (`manifest.webmanifest`)**: Prepared and linked production-grade shortcut profiles, status theme color alignments, and responsive app badge vectors.
+
 ### Version 0.7.9 (June 2, 2026)
 - **Database Row Level Security (RLS)**: Enabled Row Level Security on all tables (`users`, `rooms`, `reservations`, `otps`) to eliminate security vulnerabilities and protect database integrity.
 - **Enhanced Security Compliance**: Implemented robust user-access policies matching strict column checking to clear all Supabase Security Advisor "RLS Policy Always True" warnings.
@@ -622,7 +631,7 @@ For support, please contact:
 
 ---
 
-**Last Updated:** June 02, 2026
+**Last Updated:** June 08, 2026
 ```
 
 This README provides:
