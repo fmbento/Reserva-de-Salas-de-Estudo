@@ -4147,7 +4147,7 @@ export default function App() {
                 setCurrentView('schedules');
                 setMobileShowDetails(false);
               }}
-              className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
+              className={`hidden sm:flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
                 currentView === 'schedules' ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500'
               }`}
               style={{ minWidth: '48px', minHeight: '48px' }}

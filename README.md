@@ -488,7 +488,8 @@ For support, please contact:
 - **Native Android & Web QR Code Scanning Bridge**: Implemented a global callback interface (`window.handleScannedQR`) allowing the Android WebView Companion App to instantly inject scanned QR values.
 - **Dynamic URL & ID Parsing Routing**: Smart path recognition that resolves direct study room routes (e.g., `https://reserva-de-salas-de-estudo.vercel.app/sala/17.3.18`), short paths (`sala/17.3.18`), or simple IDs, updating map offsets and sliding active room detailed booking sheets directly into view.
 - **Premium Immersive Scanner Modal**: Created a dark cyber-themed web fallback scanning modal. Features glowing retro finder brackets, a looping laser scanning sweep animation, real-time bridge connection indicators, and a live Room simulation list to test QR scan flows instantly from any standard browser!
-- **Integrated QR Nav Icon**: Fixed an intuitive barcode scanning hub icon ("Ler QR") directly in the center of the mobile bottom navigation bar.
+- **Integrated QR Nav Icon**: Fixed an intuitive barcode scanning hub icon ("Ler QR") exclusively for companion standalone mobile views.
+- **Responsive Schedules Bottom Bar Filtering**: Tuned the Schedules ("Horários") button in the bottom navigation to hide on narrow mobile phone dimensions to minimize menu density, while ensuring it remains visual and operational on tablet viewports and full desktop displays.
 
 ### Version 0.8.1 (June 8, 2026)
 - **Advanced Dynamic Map Zoom & Pan**: Enabled high-precision multi-touch pinch-to-zoom and drag-to-pan gestures on mobile and Android screens, allowing granular navigation across campus floor maps.
