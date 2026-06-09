@@ -4163,32 +4163,34 @@ export default function App() {
           )}
 
           {/* Hub 2.5: QR Detector (Optimized for Android Companion / Mobile Browsers) */}
-          <button 
-            onClick={() => {
-              // Trigger bridge scan if available in android companion mode
-              if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.startQRScanner) {
-                try {
-                  (window as any).AndroidBridge.startQRScanner();
-                } catch (err) {
-                  console.error("Failed to call AndroidBridge", err);
+          {isAndroidApp && (
+            <button 
+              onClick={() => {
+                // Trigger bridge scan if available in android companion mode
+                if (typeof window !== 'undefined' && (window as any).AndroidBridge && (window as any).AndroidBridge.startQRScanner) {
+                  try {
+                    (window as any).AndroidBridge.startQRScanner();
+                  } catch (err) {
+                    console.error("Failed to call AndroidBridge", err);
+                  }
                 }
-              }
-              // Always open the scanner overlay inside web for instructions & simulation feedback
-              setShowQRScanner(true);
-            }}
-            className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
-              showQRScanner ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-blue-400'
-            }`}
-            style={{ minWidth: '48px', minHeight: '48px' }}
-          >
-            <div className="relative">
-              <QrCode size={22} className={`transition-transform duration-200 ${showQRScanner ? 'scale-110 text-emerald-500' : ''}`} />
-              {showQRScanner && (
-                <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              )}
-            </div>
-            <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Ler QR' : 'Scan QR'}</span>
-          </button>
+                // Always open the scanner overlay inside web for instructions & simulation feedback
+                setShowQRScanner(true);
+              }}
+              className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
+                showQRScanner ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500 hover:text-primary dark:hover:text-blue-400'
+              }`}
+              style={{ minWidth: '48px', minHeight: '48px' }}
+            >
+              <div className="relative">
+                <QrCode size={22} className={`transition-transform duration-200 ${showQRScanner ? 'scale-110 text-emerald-500' : ''}`} />
+                {showQRScanner && (
+                  <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                )}
+              </div>
+              <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Ler QR' : 'Scan QR'}</span>
+            </button>
+          )}
 
           {/* Hub 3: Reservations */}
           <button 
