@@ -484,6 +484,10 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.8.3 (June 9, 2026)
+- **Dynamic Time-Interval Range Display in Duration Selector**: Programmed active duration option lists to calculate and appends dynamic start and end times (e.g., `"1 Hora (18:30 - 19:30)"`) inside the booking dropdown for all non-desktop interfaces, accelerating scheduling feedback.
+- **Precision Device Navigation Tuning**: Fully integrated hidden indicators for Schedules ("Horários") bottom navigation elements on mobile screens while preserving native displays for tablet viewports and desktop dashboards.
+
 ### Version 0.8.2 (June 8, 2026)
 - **Native Android & Web QR Code Scanning Bridge**: Implemented a global callback interface (`window.handleScannedQR`) allowing the Android WebView Companion App to instantly inject scanned QR values.
 - **Dynamic URL & ID Parsing Routing**: Smart path recognition that resolves direct study room routes (e.g., `https://reserva-de-salas-de-estudo.vercel.app/sala/17.3.18`), short paths (`sala/17.3.18`), or simple IDs, updating map offsets and sliding active room detailed booking sheets directly into view.

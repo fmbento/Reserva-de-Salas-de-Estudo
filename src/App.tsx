@@ -4051,16 +4051,32 @@ export default function App() {
                           </div>
                         )}
 
-                        <div className="space-y-1.5">
+                        <div className="space-y-1.5 align-middle">
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.durationLabel}</label>
                           <select 
                             value={bookingDuration}
                             onChange={(e) => setBookingDuration(e.target.value)}
                             className="w-full rounded-2xl border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 focus:border-primary focus:ring-primary appearance-none"
                           >
-                            {DURATION_OPTIONS.filter(opt => opt.mins <= MAX_BOOKING_DURATION_MINS).map(opt => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
+                            {DURATION_OPTIONS.filter(opt => opt.mins <= MAX_BOOKING_DURATION_MINS).map(opt => {
+                              let optionLabel = opt.label;
+                              if (bookingStartTime) {
+                                const [h, m] = bookingStartTime.split(':').map(Number);
+                                if (!isNaN(h) && !isNaN(m)) {
+                                  const startTotal = h * 60 + m;
+                                  const endTotal = startTotal + opt.mins;
+                                  const endH = Math.floor(endTotal / 60) % 24;
+                                  const endM = endTotal % 60;
+                                  const endTimeStr = `${endH.toString().padStart(2, '0')}:${endM.toString().padStart(2, '0')}`;
+                                  optionLabel = `${opt.label} (${bookingStartTime} - ${endTimeStr})`;
+                                }
+                              }
+                              return (
+                                <option key={opt.value} value={opt.value}>
+                                  {optionLabel}
+                                </option>
+                              );
+                            })}
                           </select>
                         </div>
                       </div>
