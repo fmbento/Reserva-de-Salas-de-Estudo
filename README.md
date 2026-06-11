@@ -484,6 +484,9 @@ For support, please contact:
 
 ## 🔄 Changelog
 
+### Version 0.8.4 (June 11, 2026)
+- **High-Precision Email Floor Plan Highlights & Dynamic Localization**: Integrated inline, high-contrast floor plans inside pending reservation requests, confirmation statuses, and 15-minute start reminder emails. Uses `jimp` to draw a gorgeous, glowing, multi-layered red marker atop the exact room coordinates dynamically, complete with multi-lingual localization text (e.g. `"Biblioteca da UA, Piso 3, Frente"`) displayed above the floor plan.
+
 ### Version 0.8.3 (June 9, 2026)
 - **Dynamic Time-Interval Range Display in Duration Selector**: Programmed active duration option lists to calculate and appends dynamic start and end times (e.g., `"1 Hora (18:30 - 19:30)"`) inside the booking dropdown for all non-desktop interfaces, accelerating scheduling feedback.
 - **Precision Device Navigation Tuning**: Fully integrated hidden indicators for Schedules ("Horários") bottom navigation elements on mobile screens while preserving native displays for tablet viewports and desktop dashboards.

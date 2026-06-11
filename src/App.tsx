@@ -2971,6 +2971,7 @@ export default function App() {
         body: JSON.stringify({
           email: currentUser?.email,
           roomName: selectedRoom.name,
+          roomId: selectedRoomId,
           date: bookingDate,
           startTime: activeStartTime,
           duration: durationMins,

@@ -8,6 +8,7 @@ import * as ics from 'ics';
 import http from "http";
 import { translations, Language } from "./translations.js";
 import { createClient } from '@supabase/supabase-js';
+import { Jimp } from 'jimp';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,6 +84,151 @@ if (fs.existsSync(mapsPath)) {
   });
 }
 
+// --- Helper functions for Room Location and Highlight Map Generation ---
+async function fetchRoomDetails(roomId: string) {
+  if (!supabaseUrl || !supabaseKey || !roomId) return null;
+  try {
+    const { data, error } = await supabase
+      .from('rooms')
+      .select('*')
+      .or(`id.eq."${roomId}",name.eq."${roomId}"`)
+      .single();
+    
+    if (error) {
+      // Fallback: list all rooms and find a match manually to tolerate string/numeric casting inconsistencies
+      const { data: listData } = await supabase
+        .from('rooms')
+        .select('*');
+      
+      const found = listData?.find((r: any) => 
+        String(r.id).trim().toLowerCase() === String(roomId).trim().toLowerCase() || 
+        String(r.name).trim().toLowerCase() === String(roomId).trim().toLowerCase()
+      );
+      return found || null;
+    }
+    return data;
+  } catch (err) {
+    console.error("[SERVER] Error fetching room details:", err);
+    return null;
+  }
+}
+
+function getRoomLocationText(room: any, lang: Language = 'pt'): string {
+  const isPt = lang === 'pt';
+  const b = room.building || '17';
+  const f = room.floor || '3';
+  const s = room.section || 'Frente';
+  
+  let buildingName = b;
+  if (b === '17') {
+    buildingName = isPt ? 'Biblioteca da UA' : 'UA Library';
+  }
+  
+  let floorName = isPt ? `Piso ${f}` : `Floor ${f}`;
+  
+  let sectionName = s;
+  if (!isPt) {
+    if (s.toLowerCase() === 'frente') sectionName = 'Front';
+    else if (s.toLowerCase() === 'trás' || s.toLowerCase() === 'tras') sectionName = 'Back';
+  }
+  
+  return `${buildingName}, ${floorName}, ${sectionName}`;
+}
+
+async function getHighlightedMapBuffer(room: any): Promise<Buffer | null> {
+  try {
+    let topVal = room.top;
+    let leftVal = room.left;
+
+    // Fallbacks matching App.tsx coordinates
+    if (!topVal || !leftVal) {
+      const rid = String(room.id);
+      if (rid === '101') { topVal = '20%'; leftVal = '15%'; }
+      else if (rid === '102') { topVal = '20%'; leftVal = '30%'; }
+      else if (rid === '201') { topVal = '50%'; leftVal = '45%'; }
+      else { topVal = '70%'; leftVal = '70%'; }
+    }
+
+    const parsePercentage = (percStr: any): number => {
+      if (typeof percStr === 'number') return percStr / 100;
+      if (!percStr || typeof percStr !== 'string') return 0.5;
+      const num = parseFloat(percStr.replace('%', ''));
+      return isNaN(num) ? 0.5 : num / 100;
+    };
+
+    const topRatio = parsePercentage(topVal);
+    const leftRatio = parsePercentage(leftVal);
+
+    const b = room.building || '17';
+    const f = room.floor || '3';
+    const s = room.section || 'Frente';
+    const key = `${b}-${f}-${s}`;
+    const mapUrl = mapsConfig[key] || `https://picsum.photos/seed/ua-floorplan-${b}-${f}-${s}/1200/800?grayscale&blur=2`;
+
+    console.log(`[MAP-GEN] Loading floor plan from ${mapUrl} for room ${room.name || room.id} (${key})`);
+    
+    const image = await Jimp.read(mapUrl);
+    const width = image.bitmap.width;
+    const height = image.bitmap.height;
+
+    const cx = Math.round(leftRatio * width);
+    const cy = Math.round(topRatio * height);
+
+    console.log(`[MAP-GEN] Highlight target on (${width}x${height}): cx=${cx}, cy=${cy}`);
+
+    // Helper to blend color
+    const blendPixel = (x: number, y: number, r: number, g: number, b: number, alpha: number) => {
+      if (x < 0 || x >= width || y < 0 || y >= height) return;
+      
+      const currentInt = image.getPixelColor(x, y);
+      const curA = currentInt & 0xff;
+      const curB = (currentInt >> 8) & 0xff;
+      const curG = (currentInt >> 16) & 0xff;
+      const curR = (currentInt >> 24) & 0xff;
+
+      const newR = Math.round(curR * (1 - alpha) + r * alpha);
+      const newG = Math.round(curG * (1 - alpha) + g * alpha);
+      const newB = Math.round(curB * (1 - alpha) + b * alpha);
+      const newInt = ((newR << 24) >>> 0) + (newG << 16) + (newB << 8) + 255;
+      image.setPixelColor(newInt, x, y);
+    };
+
+    // Paint layered glowing locator
+    for (let dy = -25; dy <= 25; dy++) {
+      for (let dx = -25; dx <= 25; dx++) {
+        const tx = cx + dx;
+        const ty = cy + dy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist <= 10) {
+          // Inner solid bright red circle
+          blendPixel(tx, ty, 239, 68, 68, 1.0); // bg-red-500
+        } else if (dist <= 13) {
+          // High contrast white ring outline
+          blendPixel(tx, ty, 255, 255, 255, 0.9);
+        } else if (dist <= 20) {
+          // outer transparent active halo
+          const alpha = 0.45 * (1 - (dist - 13) / 7);
+          blendPixel(tx, ty, 239, 68, 68, alpha);
+        }
+      }
+    }
+
+    let buffer: Buffer;
+    if (typeof (image as any).getBufferAsync === 'function') {
+      buffer = await (image as any).getBufferAsync("image/jpeg");
+    } else if (typeof (image as any).getBuffer === 'function') {
+      buffer = await (image as any).getBuffer("image/jpeg");
+    } else {
+      throw new Error("No getBuffer method on Jimp image");
+    }
+    return buffer;
+  } catch (err) {
+    console.error(`[MAP-GEN] Failed to generate map buffer:`, err);
+    return null;
+  }
+}
+
 // --- Email configuration ---
 const smtpPort = process.env.SMTP_PORT || '587';
 console.log(`[AUTH] SMTP Config: Host=${process.env.SMTP_HOST || 'smtp.gmail.com'}, Port=${smtpPort}, User=${process.env.SMTP_USER ? 'Set' : 'Not Set'}, Pass=${process.env.SMTP_PASS ? 'Set' : 'Not Set'}`);
@@ -148,10 +294,37 @@ function formatReservationTime(startTime: string, duration: any, lang: Language 
   return `${startTime} - ${endTime} (${translations[lang].duration}: ${durationStr})`;
 }
 
-async function sendReservationPendingEmail(email: string, roomName: string, date: string, startTime: string, duration: number, lang: Language = 'pt') {
+async function sendReservationPendingEmail(email: string, roomName: string, date: string, startTime: string, duration: number, lang: Language = 'pt', roomId?: string) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
   const t = translations[lang];
+  
+  let attachments: any[] = [];
+  let mapHtml = '';
+  
   try {
+    const room = await fetchRoomDetails(roomId || roomName);
+    if (room) {
+      const mapBuffer = await getHighlightedMapBuffer(room);
+      if (mapBuffer) {
+        attachments.push({
+          filename: 'room-map.jpg',
+          content: mapBuffer,
+          cid: 'room_map'
+        });
+        const locationText = getRoomLocationText(room, lang);
+        mapHtml = `
+          <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+            <p style="margin: 5px 0; font-size: 14px; color: #555; font-weight: bold; text-align: center;">
+              ${locationText}
+            </p>
+            <div style="text-align: center; margin-top: 10px;">
+              <img src="cid:room_map" alt="Localização da Sala" style="max-width: 100%; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+            </div>
+          </div>
+        `;
+      }
+    }
+
     await transporter.sendMail({
       from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
       to: email,
@@ -165,10 +338,12 @@ async function sendReservationPendingEmail(email: string, roomName: string, date
             <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${date}</p>
             <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(startTime, duration, lang)}</p>
           </div>
+          ${mapHtml}
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
           <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
         </div>
       `,
+      attachments: attachments.length > 0 ? attachments : undefined
     });
   } catch (error) {
     console.error(`[EMAIL] Failed to send pending email to ${email}:`, error);
@@ -183,6 +358,7 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
   const subject = isConfirmed ? t.emailReservationSubject : `${t.emailReservationSubject} - ${lang === 'pt' ? 'CANCELADA' : 'CANCELLED'}`;
   
   let attachments: any[] = [];
+  let mapHtml = '';
   
   if (isConfirmed) {
     const [year, month, day] = res.date.split('-').map(Number);
@@ -211,6 +387,33 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
         contentType: 'text/calendar'
       });
     });
+
+    try {
+      const room = await fetchRoomDetails(res.roomId || res.room_id || roomName);
+      if (room) {
+        const mapBuffer = await getHighlightedMapBuffer(room);
+        if (mapBuffer) {
+          attachments.push({
+            filename: 'room-map.jpg',
+            content: mapBuffer,
+            cid: 'room_map'
+          });
+          const locationText = getRoomLocationText(room, lang);
+          mapHtml = `
+            <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+              <p style="margin: 5px 0; font-size: 14px; color: #555; font-weight: bold; text-align: center;">
+                ${locationText}
+              </p>
+              <div style="text-align: center; margin-top: 10px;">
+                <img src="cid:room_map" alt="Localização da Sala" style="max-width: 100%; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+              </div>
+            </div>
+          `;
+        }
+      }
+    } catch (roomErr) {
+      console.error("[EMAIL-MAP] Failed fetching room on status change:", roomErr);
+    }
   }
 
   try {
@@ -228,6 +431,7 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
             <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${res.date}</p>
             <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(res.startTime, res.duration, lang)}</p>
           </div>
+          ${mapHtml}
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
           <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
         </div>
@@ -240,8 +444,8 @@ async function sendReservationStatusEmail(email: string, roomName: string, res: 
 }
 
 app.post("/api/emails/reservation-pending", async (req, res) => {
-  const { email, roomName, date, startTime, duration, lang } = req.body;
-  await sendReservationPendingEmail(email, roomName, date, startTime, duration, lang);
+  const { email, roomName, roomId, date, startTime, duration, lang } = req.body;
+  await sendReservationPendingEmail(email, roomName, date, startTime, duration, lang, roomId);
   res.status(200).json({ success: true });
 });
 
@@ -403,7 +607,34 @@ export default app;
 async function sendReminderEmail(email: string, roomName: string, res: any, lang: Language = 'pt') {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) return;
   const t = translations[lang];
+  
+  let attachments: any[] = [];
+  let mapHtml = '';
+  
   try {
+    const room = await fetchRoomDetails(res.roomId || res.room_id || roomName);
+    if (room) {
+      const mapBuffer = await getHighlightedMapBuffer(room);
+      if (mapBuffer) {
+        attachments.push({
+          filename: 'room-map.jpg',
+          content: mapBuffer,
+          cid: 'room_map'
+        });
+        const locationText = getRoomLocationText(room, lang);
+        mapHtml = `
+          <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+            <p style="margin: 5px 0; font-size: 14px; color: #555; font-weight: bold; text-align: center;">
+              ${locationText}
+            </p>
+            <div style="text-align: center; margin-top: 10px;">
+              <img src="cid:room_map" alt="Localização da Sala" style="max-width: 100%; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);" />
+            </div>
+          </div>
+        `;
+      }
+    }
+
     await transporter.sendMail({
       from: process.env.SMTP_FROM || `"SiReS Bibliotecas UA" <${process.env.SMTP_USER}>`,
       to: email,
@@ -418,10 +649,12 @@ async function sendReminderEmail(email: string, roomName: string, res: any, lang
             <p style="margin: 5px 0;"><strong>${t.emailDate}:</strong> ${res.date}</p>
             <p style="margin: 5px 0;"><strong>${t.emailTime}:</strong> ${formatReservationTime(res.startTime, res.duration, lang)}</p>
           </div>
+          ${mapHtml}
           <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
           <p style="text-align: center; color: #999; font-size: 12px;">${t.uaTitle} - SiReS</p>
         </div>
       `,
+      attachments: attachments.length > 0 ? attachments : undefined
     });
   } catch (error) {
     console.error(`[EMAIL] Failed to send reminder email to ${email}:`, error);
