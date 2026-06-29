@@ -5037,7 +5037,7 @@ function RoomMarker({ room, isSelected, onClick, statusColor, status, mapScale =
           animate={{ scale: isSelected ? scaleAdjust * 1.15 : scaleAdjust }}
           transition={{ type: 'spring', stiffness: 280, damping: 22 }}
           className={`px-3 py-1 text-white text-[10px] font-bold rounded-full shadow-lg border-2 ${
-            isSelected ? 'border-rose-600 bg-rose-500 ring-4 ring-rose-500/10' : 'border-white dark:border-slate-800'
+            isSelected ? 'border-blue-600 bg-blue-500 ring-4 ring-blue-500/10' : 'border-white dark:border-slate-800'
           } ${statusColor}`}
           style={{
             fontSize: isAndroidApp ? '11px' : '10px',
