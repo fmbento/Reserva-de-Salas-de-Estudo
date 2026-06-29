@@ -42,6 +42,8 @@ The system features:
 <img width="1898" height="938" alt="image" src="https://github.com/user-attachments/assets/c7e8ec57-4cb3-4b21-bed5-db5b74f38c06" />
 
 ### Mobile:
+ Native and intelligent mobile wrapper for the SiReS UA study room booking portal. Developed in Kotlin and Jetpack Compose, it provides a fluid, immersive mobile experience, resilient to network failures, and with advanced native integration to streamline students' daily lives.
+ See all the features at https://github.com/fmbento/Reserva-de-Salas-de-Estudo-Android_Companion 
 
 <img width="305" height="519" alt="image" src="https://github.com/user-attachments/assets/c2f99a52-2ab6-4362-8d2b-a872c48edbb6" /> 
 <img width="309" height="503" alt="image" src="https://github.com/user-attachments/assets/23b0ae17-9c55-42b7-8229-899e5d88a82a" /> <img width="308" height="507" alt="image" src="https://github.com/user-attachments/assets/7d2deba6-937f-4548-b689-743205772648" />
