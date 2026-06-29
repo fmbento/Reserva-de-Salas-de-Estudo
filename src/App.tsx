@@ -2252,7 +2252,10 @@ const SearchRoomsView = ({
   setMobileShowDetails,
   lang,
   getDynamicRoomStatus,
-  isTimeAllowed
+  isTimeAllowed,
+  setSelectedBuilding,
+  setSelectedFloor,
+  setSelectedSection
 }: {
   rooms: Room[];
   reservations: Reservation[];
@@ -2263,6 +2266,9 @@ const SearchRoomsView = ({
   lang: string;
   getDynamicRoomStatus: (roomId: string, date: string, startTime: string) => 'Available' | 'Pending' | 'Occupied';
   isTimeAllowed: (buildingId: string, dateStr: string, timeStr: string) => boolean;
+  setSelectedBuilding: (b: string) => void;
+  setSelectedFloor: (f: string) => void;
+  setSelectedSection: (s: string) => void;
 }) => {
   const t = translations[lang as keyof typeof translations];
   
@@ -2352,6 +2358,9 @@ const SearchRoomsView = ({
     setBookingDate(searchDate);
     setBookingStartTime(searchTime);
     setSelectedRoomId(room.id);
+    setSelectedBuilding(room.building);
+    setSelectedFloor(room.floor);
+    setSelectedSection(room.section);
     setMobileShowDetails(true);
   };
 
@@ -3025,10 +3034,6 @@ export default function App() {
     setIsLoggedIn(false);
     setCurrentUser(null);
   };
-
-  useEffect(() => {
-    console.log("Current allUsers state:", allUsers);
-  }, [allUsers]);
 
   useEffect(() => {
     if (!isLoggedIn || !isAuthReady) return;
@@ -4051,6 +4056,9 @@ export default function App() {
                 lang={lang}
                 getDynamicRoomStatus={getDynamicRoomStatus}
                 isTimeAllowed={isTimeAllowed}
+                setSelectedBuilding={setSelectedBuilding}
+                setSelectedFloor={setSelectedFloor}
+                setSelectedSection={setSelectedSection}
               />
             ) : currentView === 'reservations' ? (
               <motion.div 
@@ -4196,7 +4204,7 @@ export default function App() {
         </main>
 
         {/* Room Details Sidebar (Desktop) / Bottom Sheet (Mobile) */}
-        {(currentView === 'map' || currentView === 'schedules' || currentView === 'room-details') && selectedRoom && (
+        {(currentView === 'map' || currentView === 'schedules' || currentView === 'room-details' || currentView === 'search-rooms') && selectedRoom && (
           <>
             {/* Desktop Sidebar */}
             <aside className="hidden md:flex w-80 flex-col border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto shrink-0 transition-colors">
@@ -4279,7 +4287,7 @@ export default function App() {
                             />
                           </div>
 
-                          {(currentView === 'schedules' || currentView === 'room-details') && (
+                          {(currentView === 'schedules' || currentView === 'room-details' || currentView === 'search-rooms') && (
                             <>
                               <div className="space-y-1.5">
                                 <label className="text-xs font-medium text-slate-600 dark:text-slate-400">{t.selectDate}</label>
@@ -4443,7 +4451,7 @@ export default function App() {
                           />
                         </div>
 
-                        {(currentView === 'schedules' || currentView === 'room-details') && (
+                        {(currentView === 'schedules' || currentView === 'room-details' || currentView === 'search-rooms') && (
                           <div className="grid grid-cols-2 gap-4">
                             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative overflow-hidden">
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Data</p>
