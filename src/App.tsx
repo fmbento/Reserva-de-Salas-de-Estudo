@@ -20,6 +20,7 @@ import {
   Monitor,
   ChevronRight,
   AlertCircle,
+  Info,
   CheckCircle2,
   Loader2,
   X,
@@ -2242,6 +2243,416 @@ const SchedulesView = ({
   );
 };
 
+const SearchRoomsView = ({
+  rooms,
+  reservations,
+  setSelectedRoomId,
+  setBookingDate,
+  setBookingStartTime,
+  setMobileShowDetails,
+  lang,
+  getDynamicRoomStatus,
+  isTimeAllowed
+}: {
+  rooms: Room[];
+  reservations: Reservation[];
+  setSelectedRoomId: (id: string) => void;
+  setBookingDate: (date: string) => void;
+  setBookingStartTime: (time: string) => void;
+  setMobileShowDetails: (show: boolean) => void;
+  lang: string;
+  getDynamicRoomStatus: (roomId: string, date: string, startTime: string) => 'Available' | 'Pending' | 'Occupied';
+  isTimeAllowed: (buildingId: string, dateStr: string, timeStr: string) => boolean;
+}) => {
+  const t = translations[lang as keyof typeof translations];
+  
+  // Calculate next 15-minute slot as default
+  const defaultSlot = useMemo(() => {
+    return getAppNextSlot();
+  }, []);
+
+  const [searchBuilding, setSearchBuilding] = useState('17');
+  const [searchDate, setSearchDate] = useState(defaultSlot.date);
+  const [searchTime, setSearchTime] = useState(defaultSlot.time);
+  const [minCapacity, setMinCapacity] = useState<number>(1);
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [textQuery, setTextQuery] = useState('');
+  const [hasSearched, setHasSearched] = useState(true);
+
+  // Get unique buildings from active rooms
+  const buildings = useMemo(() => {
+    const list = rooms.map(r => r.building).filter(Boolean);
+    return Array.from(new Set(list));
+  }, [rooms]);
+
+  // Generate 15-minute intervals from 08:00 to 22:00
+  const timeSlots = useMemo(() => {
+    const slots: string[] = [];
+    for (let h = 8; h <= 22; h++) {
+      for (let m = 0; m < 60; m += 15) {
+        slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
+      }
+    }
+    return slots;
+  }, []);
+
+  const AVAILABLE_AMENITIES = getAvailableAmenities(t);
+
+  const handleToggleAmenity = (id: string) => {
+    setSelectedAmenities(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const filteredRooms = useMemo(() => {
+    // 1. Base rooms filter: active and matches selected building
+    let list = rooms.filter(room => {
+      const isBuildingMatch = room.building === searchBuilding;
+      const isActive = room.operationalStatus === 'Active';
+      return isBuildingMatch && isActive;
+    });
+
+    // 2. Capacity filter (pelo menos N pax)
+    list = list.filter(room => room.capacity >= minCapacity);
+
+    // 3. Amenities filter (all selected must be present)
+    if (selectedAmenities.length > 0) {
+      list = list.filter(room => 
+        selectedAmenities.every(amenityId => room.amenities.includes(amenityId))
+      );
+    }
+
+    // 4. Time allowance & reservation availability filter
+    list = list.filter(room => {
+      // Must be allowed time
+      if (!isTimeAllowed(searchBuilding, searchDate, searchTime)) {
+        return false;
+      }
+      // Must be available (no overlaps)
+      const status = getDynamicRoomStatus(room.id, searchDate, searchTime);
+      return status === 'Available';
+    });
+
+    // 5. Text search query
+    if (textQuery.trim() !== '') {
+      const q = textQuery.toLowerCase();
+      list = list.filter(room => 
+        room.name.toLowerCase().includes(q) || 
+        room.department.toLowerCase().includes(q)
+      );
+    }
+
+    // Alphanumeric sorting of room names
+    return list.sort((a, b) => 
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
+  }, [rooms, searchBuilding, searchDate, searchTime, minCapacity, selectedAmenities, textQuery, reservations]);
+
+  const handleSelectRoom = (room: Room) => {
+    setBookingDate(searchDate);
+    setBookingStartTime(searchTime);
+    setSelectedRoomId(room.id);
+    setMobileShowDetails(true);
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 dark:bg-slate-950 transition-colors">
+      <div className="max-w-4xl mx-auto space-y-6 pb-20">
+        {/* Page Header */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
+          <h2 className="text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+            <Search className="h-6 w-6 text-primary" />
+            {lang === 'pt' ? 'Procurar Salas Disponíveis' : 'Search Available Rooms'}
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            {lang === 'pt' 
+              ? 'Encontra espaços ativos e totalmente disponíveis no horário e edifício pretendidos.' 
+              : 'Find active and fully available spaces in your preferred building and timeframe.'}
+          </p>
+        </div>
+
+        {/* Search Controls Card */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 space-y-6">
+          {/* Building, Day, Hour Dropdowns */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Edifício Select */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+                {lang === 'pt' ? 'Edifício' : 'Building'}
+              </label>
+              <div className="relative">
+                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                <select
+                  value={searchBuilding}
+                  onChange={(e) => setSearchBuilding(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white focus:border-primary focus:ring-primary focus:ring-1 appearance-none cursor-pointer"
+                >
+                  {buildings.map(b => (
+                    <option key={b} value={b}>
+                      {b === '17' ? (t.biblioteca || 'Biblioteca') : b === '18' ? (t.mediateca || 'Mediateca') : `${lang === 'pt' ? 'Edifício' : 'Building'} ${b}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Dia DatePicker */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+                {lang === 'pt' ? 'Dia / Data' : 'Day / Date'}
+              </label>
+              <div className="relative">
+                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                <input
+                  type="date"
+                  value={searchDate}
+                  min={getAppDate()}
+                  onChange={(e) => setSearchDate(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white focus:border-primary focus:ring-primary focus:ring-1 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Hora Select */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest block">
+                {lang === 'pt' ? 'Hora' : 'Time'}
+              </label>
+              <div className="relative">
+                <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500 pointer-events-none" />
+                <select
+                  value={searchTime}
+                  onChange={(e) => setSearchTime(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white focus:border-primary focus:ring-primary focus:ring-1 appearance-none cursor-pointer"
+                >
+                  {timeSlots.map(time => (
+                    <option key={time} value={time}>
+                      {time}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <hr className="border-slate-100 dark:border-slate-800/60" />
+
+          {/* Filters Zone: Ocupação and Funcionalidades */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+              {lang === 'pt' ? 'Filtros Adicionais' : 'Additional Filters'}
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              {/* Occupancy Selector */}
+              <div className="space-y-3">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
+                  {lang === 'pt' ? 'Ocupação (pelo menos N pax)' : 'Capacity (at least N pax)'}
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMinCapacity(prev => Math.max(1, prev - 1))}
+                    disabled={minCapacity <= 1}
+                    className="h-11 w-11 flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Minus size={16} />
+                  </button>
+                  <div className="h-11 px-5 flex items-center justify-center bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800 rounded-xl font-bold text-slate-900 dark:text-white text-base min-w-[70px]">
+                    {minCapacity} pax
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMinCapacity(prev => prev + 1)}
+                    className="h-11 w-11 flex items-center justify-center bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Text Search Input within Filters Zone */}
+              <div className="space-y-3">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
+                  {lang === 'pt' ? 'Pesquisar Nome/Departamento' : 'Search Name/Department'}
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-500" />
+                  <input
+                    type="text"
+                    value={textQuery}
+                    onChange={(e) => setTextQuery(e.target.value)}
+                    placeholder={lang === 'pt' ? 'Ex: Sala 101, Matemática...' : 'Ex: Room 101, Math...'}
+                    className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl pl-12 pr-4 py-3 text-sm font-bold text-slate-900 dark:text-white focus:border-primary focus:ring-primary focus:ring-1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Amenities Grid with Checkboxes */}
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 block">
+                {lang === 'pt' ? 'Funcionalidades Necessárias' : 'Required Amenities'}
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {AVAILABLE_AMENITIES.map(amenity => {
+                  const isChecked = selectedAmenities.includes(amenity.id);
+                  return (
+                    <button
+                      key={amenity.id}
+                      type="button"
+                      onClick={() => handleToggleAmenity(amenity.id)}
+                      className={`flex items-center gap-3 p-3 rounded-2xl border text-left transition-all ${
+                        isChecked
+                          ? 'bg-primary/5 dark:bg-primary/10 border-primary text-primary font-bold shadow-sm shadow-primary/5'
+                          : 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className={`h-5 w-5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${
+                        isChecked 
+                          ? 'bg-primary border-primary text-white' 
+                          : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900'
+                      }`}>
+                        {isChecked && <Check size={12} strokeWidth={3} />}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs truncate">
+                        {amenity.icon}
+                        <span className="truncate">{amenity.label}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <button
+              onClick={() => {
+                setHasSearched(true);
+              }}
+              className="px-8 py-3.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-2xl shadow-xl shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all flex items-center gap-2"
+            >
+              <Search size={20} />
+              {lang === 'pt' ? 'Pesquisar Salas' : 'Search Rooms'}
+            </button>
+          </div>
+        </div>
+
+        {/* Results Section */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center px-2">
+            <h3 className="font-extrabold text-slate-900 dark:text-white text-base">
+              {lang === 'pt' ? 'Salas Encontradas' : 'Found Rooms'} ({filteredRooms.length})
+            </h3>
+            <span className="text-xs font-semibold text-slate-400">
+              {lang === 'pt' ? 'Ordenadas Alfanumericamente' : 'Sorted Alphanumerically'}
+            </span>
+          </div>
+
+          {!isTimeAllowed(searchBuilding, searchDate, searchTime) ? (
+            <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/30 rounded-3xl p-8 text-center space-y-3">
+              <AlertCircle className="h-10 w-10 text-rose-500 mx-auto" />
+              <h4 className="text-sm font-bold text-rose-900 dark:text-rose-400">
+                {lang === 'pt' ? 'Edifício Encerrado' : 'Building Closed'}
+              </h4>
+              <p className="text-xs text-rose-600 dark:text-rose-500/80 max-w-md mx-auto">
+                {lang === 'pt'
+                  ? 'O edifício selecionado está encerrado na data ou hora escolhida. Por favor, ajuste o seu horário de pesquisa.'
+                  : 'The selected building is closed on the chosen day or time. Please adjust your search timeframe.'}
+              </p>
+            </div>
+          ) : filteredRooms.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-12 text-center border border-slate-100 dark:border-slate-800 space-y-4">
+              <Info className="h-12 w-12 text-slate-300 dark:text-slate-700 mx-auto" />
+              <div className="space-y-1">
+                <h4 className="text-base font-bold text-slate-800 dark:text-slate-200">
+                  {lang === 'pt' ? 'Nenhuma sala disponível' : 'No available rooms'}
+                </h4>
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                  {lang === 'pt'
+                    ? 'Não foram encontradas salas ativas e disponíveis que correspondam aos filtros de ocupação e funcionalidades selecionados neste horário.'
+                    : 'No active and available rooms were found that match the selected capacity and amenity filters in this timeframe.'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {filteredRooms.map(room => (
+                <motion.div
+                  key={room.id}
+                  layoutId={`search-room-card-${room.id}`}
+                  onClick={() => handleSelectRoom(room)}
+                  className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800/80 shadow-sm hover:shadow-md hover:border-primary/30 dark:hover:border-primary/30 transition-all p-5 cursor-pointer flex flex-col justify-between gap-4 group"
+                >
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-extrabold text-slate-900 dark:text-white group-hover:text-primary transition-colors text-base">
+                          {room.name}
+                        </h4>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 font-semibold">
+                          {room.department} • {lang === 'pt' ? 'Piso' : 'Floor'} {room.floor}
+                        </p>
+                      </div>
+                      <span className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full border border-emerald-100/50 dark:border-emerald-900/30 shrink-0">
+                        {lang === 'pt' ? 'Disponível' : 'Available'}
+                      </span>
+                    </div>
+
+                    {/* Room Image */}
+                    <div className="aspect-video w-full rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800">
+                      <img
+                        src={room.image}
+                        alt={room.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+
+                    {/* Capacity and Amenities */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-bold px-2 py-1 rounded-lg">
+                        <Users size={12} />
+                        {room.capacity} pax
+                      </span>
+                      {AVAILABLE_AMENITIES.filter(a => room.amenities.includes(a.id)).slice(0, 3).map(a => (
+                        <span key={a.id} className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-medium px-2 py-1 rounded-lg">
+                          {React.cloneElement(a.icon as React.ReactElement, { size: 10 })}
+                          {a.label}
+                        </span>
+                      ))}
+                      {room.amenities.length > 3 && (
+                        <span className="text-[10px] font-bold text-slate-400 self-center pl-1">
+                          +{room.amenities.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-50 dark:border-slate-800/40 flex justify-between items-center">
+                    <span className="text-xs font-bold text-primary dark:text-blue-400 flex items-center gap-1">
+                      <Clock size={13} />
+                      {searchTime}
+                    </span>
+                    <button
+                      type="button"
+                      className="px-4 py-2 bg-slate-100 group-hover:bg-primary text-slate-700 group-hover:text-white dark:bg-slate-800 dark:text-slate-300 font-bold text-xs rounded-xl flex items-center gap-1 transition-all"
+                    >
+                      {lang === 'pt' ? 'Reservar' : 'Book'}
+                      <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [lang, setLang] = useState<Language>(() => {
     const saved = Cookies.get('sirs_lang');
@@ -2272,7 +2683,7 @@ export default function App() {
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'room-details' | 'backoffice' | 'manage-rooms' | 'manage-users' | 'management'>('map');
+  const [currentView, setCurrentView] = useState<'map' | 'reservations' | 'schedules' | 'room-details' | 'backoffice' | 'manage-rooms' | 'manage-users' | 'management' | 'search-rooms'>('map');
   const [isAndroidApp, setIsAndroidApp] = useState(false);
 
   // Standalone PWA / Android App Detection & Custom Layout Adapters
@@ -2292,7 +2703,7 @@ export default function App() {
       if (hasViewParam) {
         const queryParams = new URLSearchParams(window.location.search);
         const view = queryParams.get('view');
-        if (view === 'map' || view === 'reservations' || view === 'schedules' || view === 'management') {
+        if (view === 'map' || view === 'reservations' || view === 'schedules' || view === 'management' || view === 'search-rooms') {
           setCurrentView(view as any);
         }
       }
@@ -3212,6 +3623,12 @@ export default function App() {
             >
               {t.navSchedules}
             </button>
+            <button 
+              onClick={() => setCurrentView('search-rooms')}
+              className={`text-sm font-semibold transition-colors ${currentView === 'search-rooms' ? 'text-[#0066cc]' : 'text-slate-600 dark:text-slate-400 hover:text-[#0066cc]'}`}
+            >
+              {t.navSearchRooms}
+            </button>
             {(currentUser?.role === 'admin' || currentUser?.role === 'bibliotecário') && !isAndroidApp && (
               <button 
                 onClick={() => setCurrentView('backoffice')}
@@ -3384,6 +3801,12 @@ export default function App() {
                 label={t.navSchedules} 
                 active={currentView === 'schedules'} 
                 onClick={() => setCurrentView('schedules')}
+              />
+              <SidebarLink 
+                icon={<Search size={20} />} 
+                label={t.navSearchRooms} 
+                active={currentView === 'search-rooms'} 
+                onClick={() => setCurrentView('search-rooms')}
               />
               <SidebarLink 
                 icon={<CalendarCheck size={20} />} 
@@ -3616,6 +4039,18 @@ export default function App() {
                 maxBookingWindow={maxBookingWindow}
                 lang={lang}
                 setCurrentView={setCurrentView}
+              />
+            ) : currentView === 'search-rooms' ? (
+              <SearchRoomsView 
+                rooms={rooms}
+                reservations={reservations}
+                setSelectedRoomId={setSelectedRoomId}
+                setBookingDate={setBookingDate}
+                setBookingStartTime={setBookingStartTime}
+                setMobileShowDetails={setMobileShowDetails}
+                lang={lang}
+                getDynamicRoomStatus={getDynamicRoomStatus}
+                isTimeAllowed={isTimeAllowed}
               />
             ) : currentView === 'reservations' ? (
               <motion.div 
@@ -4155,6 +4590,26 @@ export default function App() {
               )}
             </div>
             <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Mapa' : 'Map'}</span>
+          </button>
+
+          {/* Search Rooms Tab */}
+          <button 
+            onClick={() => {
+              setCurrentView('search-rooms');
+              setMobileShowDetails(false);
+            }}
+            className={`flex flex-col items-center justify-center flex-1 h-full py-1.5 focus:outline-none transition-all duration-200 ${
+              currentView === 'search-rooms' ? 'text-primary dark:text-blue-400 font-extrabold scale-105' : 'text-slate-400 dark:text-slate-500'
+            }`}
+            style={{ minWidth: '48px', minHeight: '48px' }}
+          >
+            <div className="relative">
+              <Search size={22} className={`transition-transform duration-200 ${currentView === 'search-rooms' ? 'scale-110' : ''}`} />
+              {currentView === 'search-rooms' && (
+                <motion.span layoutId="activeDot" className="absolute -top-1 -right-1 block h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
+            </div>
+            <span className="text-[10px] tracking-wide mt-1">{lang === 'pt' ? 'Procurar' : 'Search'}</span>
           </button>
 
           {/* Hub 2: Schedules */}

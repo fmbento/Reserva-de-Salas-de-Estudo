@@ -158,17 +158,30 @@ docker-compose up --build -d
 
 ---
 
-## 📑 Booking Rules
+## 📑 Booking Rules & Advanced Systems
 
-To ensure fair access to study spaces, the following rules are enforced:
+To ensure fair access, prevent scheduling issues, and enhance discoverability, the following systems and rules are enforced:
 
-1.  **Preparation Buffer**: A mandatory 15-minute slot is automatically added between bookings for room preparation and transition.
+1.  **Preparation Buffer**: A mandatory 15-minute slot is automatically added between bookings for room preparation and transition. This buffer is visually respected in both the calendar and list views.
 2.  **Daily Limit**: Each user can have a maximum of **3 reservations per day**.
 3.  **Weekly Limit**: Each user can have a maximum of **5 reservations per calendar week** (Monday to Sunday).
 4.  **Booking Window**: Reservations are only possible within the **next 48 hours**, starting from the next available 15-minute slot from the current time.
 5.  **Check-in**: Users must check in with a librarian at the desk between 10 minutes before and 10 minutes after the reservation start time. Failure to check in results in automatic cancellation.
 6.  **Deep Linking**: Direct URLs for rooms are supported in the format `/sala/{ROOM_ID}` (e.g., `/sala/17.3.18`). This allows for QR code creation and direct sharing. Deep links navigate to a specialized "Room Details" list view showing availability for the next 2-3 days.
-7.  **Preparation Buffer**: A mandatory 15-minute preparation buffer is enforced between all bookings and is visually respected in both the calendar and list views.
+
+### 🔍 Search Available Rooms / Procurar Salas Disponíveis
+- **English**: A dedicated advanced search hub allows users to input their desired building, date, time slot, minimum passenger capacity, and required amenities (such as monitors, sockets, Eduroam, board, etc.). The system filters through active spaces in real-time, returning only rooms that are fully available (respecting all reservation overlaps and preparation buffers) at that exact slot, sorted alphanumerically. Users can book their chosen room directly with a single tap.
+- **Português**: Um painel dedicado de pesquisa avançada permite aos utilizadores selecionar o edifício, data, horário, capacidade mínima de pessoas (pax) e funcionalidades necessárias (ex: monitor, tomadas, Eduroam, quadro, etc.). O sistema filtra os espaços ativos em tempo real, mostrando apenas salas que estejam totalmente livres (respeitando todas as sobreposições de reservas e buffers de preparação) no horário escolhido, ordenadas alfanumericamente. O utilizador pode efetuar a reserva da sala selecionada com apenas um clique.
+
+### ⚔️ Conflict & Overlap Management / Gestão de Conflitos e Sobreposições
+- **English**: To prevent double-bookings and resolve user conflicts gracefully, the reservation system performs high-precision checks during booking submission. If a partial overlap occurs with an existing reservation (including its mandatory 15-minute preparation buffer), the system opens an interactive **Conflict Resolution Dialog** suggesting intelligent adjustments:
+  - **Case A (Shifted Start Time)**: If a prior reservation ends after the user's requested start time, the system calculates and suggests a shifted start time (exactly matching the end of the previous booking plus the 15-minute buffer), adjusting the remaining duration.
+  - **Case B (Reduced Duration)**: If a subsequent reservation starts before the user's requested end time, the system suggests a reduced duration (fitting perfectly up to the start of the next booking, minus the 15-minute buffer).
+  - **Strict Block**: If no adjustment is possible (e.g., total overlap or duration reduced to zero), the reservation is strictly rejected, showing a clear descriptive error message.
+- **Português**: Para evitar marcações duplas e resolver conflitos de forma inteligente, o sistema valida sobreposições ao submeter uma reserva. Se for detetada uma sobreposição parcial com uma reserva existente (incluindo o respetiva buffer obrigatório de preparação de 15 minutos), o sistema abre um **Diálogo de Resolução de Conflitos** interativo, sugerindo ajustes automáticos:
+  - **Caso A (Início Deslocado)**: Se a reserva anterior terminar após a hora de início pretendida, o sistema calcula e sugere uma nova hora de início (imediatamente após o fim da reserva anterior + buffer de 15 minutos), ajustando a duração restante.
+  - **Caso B (Duração Reduzida)**: Se a reserva seguinte começar antes do fim pretendido, o sistema sugere uma duração reduzida (ajustando a reserva até ao início da marcação seguinte, descontando os 15 minutos de buffer).
+  - **Bloqueio Estrito**: Caso não seja possível efetuar qualquer ajuste (ex: sobreposição total ou duração reduzida a zero), a reserva é estritamente rejeitada com uma mensagem informativa clara.
 
 ---
 
@@ -485,6 +498,10 @@ For support, please contact:
 ---
 
 ## 🔄 Changelog
+
+### Version 0.8.5 (June 29, 2026)
+- **Advanced "Search Available Rooms" Engine**: Implemented an intuitive, high-performance search view allowing users to query study spaces by building, date, 15-minute time intervals, minimum passenger capacity, and required amenities (e.g. Eduroam, monitors, sockets, board). Fully filters inactive spaces and overlaps in real-time and sorts matching rooms alphanumerically with direct-booking shortcuts.
+- **Smart Conflict & Overlap Resolution**: Programmed a seamless backend-and-frontend verification flow to handle scheduling conflicts. If a partial overlap with an existing reservation is detected (including the 15-minute prep buffer), the system triggers an interactive modal that suggests either a shifted start time (Case A) or a reduced duration (Case B) to prevent booking blocks.
 
 ### Version 0.8.4 (June 11, 2026)
 - **High-Precision Email Floor Plan Highlights & Dynamic Localization**: Integrated inline, high-contrast floor plans inside pending reservation requests, confirmation statuses, and 15-minute start reminder emails. Uses `jimp` to draw a gorgeous, glowing, multi-layered red marker atop the exact room coordinates dynamically, complete with multi-lingual localization text (e.g. `"Biblioteca da UA, Piso 3, Frente"`) displayed above the floor plan.

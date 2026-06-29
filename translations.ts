@@ -25,6 +25,7 @@ export interface TranslationKeys {
   navMap: string;
   navMyReservations: string;
   navSchedules: string;
+  navSearchRooms: string;
   navBackoffice: string;
   systemTitle: string;
   sidebarTitle: string;
@@ -292,6 +293,7 @@ export const translations: Record<Language, TranslationKeys> = {
     navMap: "Mapa de Salas",
     navMyReservations: "As Minhas Reservas",
     navSchedules: "Horários",
+    navSearchRooms: "Procurar Salas",
     navBackoffice: "Backoffice",
     systemTitle: "Reserva de Salas",
     sidebarTitle: "Bibliotecas da UA",
@@ -557,6 +559,7 @@ export const translations: Record<Language, TranslationKeys> = {
     navMap: "Room Map",
     navMyReservations: "My Reservations",
     navSchedules: "Schedules",
+    navSearchRooms: "Search Rooms",
     navBackoffice: "Backoffice",
     systemTitle: "Room Booking",
     sidebarTitle: "UA Libraries",
